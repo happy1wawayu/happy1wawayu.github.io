@@ -7,6 +7,8 @@
 <p>保护模式下内存管理方式分为两种，段与页。</p>
 <p>前面的篇章中，简要介绍了段的知识，今天就来和大家聊聊页的知识，页是保护模式中更为重要的一环，随着系统进入32-Bit，段的作用明显降低了，取而代之的则是在段的基础上，更为细分的页。</p>
 </blockquote>
+<span id="more"></span>
+
 <h2 id="段与页"><a href="#段与页" class="headerlink" title="段与页"></a>段与页</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/segAndPage.png"></p>
 <p>这是Intel白皮书中介绍关于段与页的概要图，经过段的学习，可以很容易的理解左半部分，这是一个根据所提供的<strong>有效地址（图中Offset）</strong>以及段寄存器中确定的基址，锁定线性地址空间中的某个<strong>线性地址（Linear Address）</strong>的过程。而右半部分，则是利用了页的功能，通过拆分<strong>线性地址</strong>，一步步转化成了<strong>物理地址</strong>。</p>
 <p>上述提到了3个概念，有效地址，线性地址以及物理地址，文字叙述会让人混淆，我们来看一条语句：</p>
@@ -109,6 +111,8 @@
 <p>那么问题来了，我们知道EIP和CS的值都可以通过门描述符获得，那么ESP和SS是哪来的？</p>
 <p>这就是引出了今天的内容：<strong>TSS</strong>（Task-state segment），任务状态段。</p>
 </blockquote>
+<span id="more"></span>
+
 <h2 id="TSS设计初衷"><a href="#TSS设计初衷" class="headerlink" title="TSS设计初衷"></a>TSS设计初衷</h2><p>想要学习一类知识，首先要了解它被设计出来的目的，这样就能找到方向，更好的了解它。CPU在运行时会频繁的切换任务，每次切换任务时，还没执行完的任务怎么办？总不能下次重新执行吧，于是需要保存上一个任务的上下文环境，于是，TSS诞生了，<strong>TSS是一块大小为104(0x68)个字节的内存</strong>，没错，<strong>TSS</strong>不是什么寄存器，<strong>就是一段内存，或者说是一个段</strong>，这段内存可以保存32-Bit下所有通用寄存器以及段寄存器的值，这样CPU就可以切换到新任务时，仍然保留上一个任务的环境，方便新任务执行完后，能够完好的回到先前的任务继续执行。</p>
 <p>注意，TSS是一个段，有段就有段寄存器和段描述符哟！比如我们熟悉的CS，CS就是<strong>段寄存器</strong>，它描述的是<strong>代码段</strong>，同时，它会通过段选择子从GDT表的<strong>代码段描述符</strong>中载入段的相关信息，通常情况下，代码段的范围是0~FFFFFFFF（大小是4GB）；这样一对比，就可以理解了，TSS也是如此，因为TSS也是一个段（大小是104字节），所以应该存在一个描述TSS的段寄存器从一个段描述符里加载TSS相关信息。这就是今天会依次介绍的TR寄存器和TSS段描述符。</p>
 <p>这里补充一点知识，尽管Intel设计TSS的初衷的为了方便任务切换（<strong>CPU层面叫做任务切换，操作系统层面叫做线程切换</strong>），但是Windows认为这个TSS设计的不好，因此并没有采用这个结构进行线程切换，并且Linux也没有采用TSS进行线程切换，这俩操作系统用的都是堆栈进行线程切换的。那么Windows用到了这个结构没有，当然是用到了，但仅仅用到了ESP0和SS0这两个值。</p>
@@ -195,6 +199,8 @@
 <li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
 <li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
 </ul>
+<span id="more"></span>
+
 <p>下面为不同表中，任务门进行任务切换的过程：</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
 <h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
