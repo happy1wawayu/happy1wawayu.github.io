@@ -193,14 +193,14 @@
     <title>任务门</title>
     <url>/2022/07/20/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
     <content><![CDATA[<h1 id="任务门"><a href="#任务门" class="headerlink" title="任务门"></a>任务门</h1><h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
+<span id="more"></span>
+
 <p>简要概括，任务门有如下优势：</p>
 <ul>
 <li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
 <li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
 <li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
 </ul>
-<span id="more"></span>
-
 <p>下面为不同表中，任务门进行任务切换的过程：</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
 <h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
