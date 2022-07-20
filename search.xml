@@ -223,4 +223,116 @@
         <tag>x86</tag>
       </tags>
   </entry>
+  <entry>
+    <title></title>
+    <url>/2022/07/21/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&amp;%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/</url>
+    <content><![CDATA[<h1 id="页目录-amp-页表基址"><a href="#页目录-amp-页表基址" class="headerlink" title="页目录&amp;页表基址"></a>页目录&amp;页表基址</h1><blockquote>
+<p>考虑这样一个问题，我们现在可以通过在Windbg里找到线性地址所在的物理页，通过修改物理页的属性，就可以实现一些原本受限的功能。例如将常量区对应的物理页R&#x2F;W属性修改为1，便可以修改位于常量区的元素。</p>
+<p>但是，以上操作都是基于Windbg在双击调试的环境中实现的，那么一旦脱离了调试器，该如何通过代码来实现对物理页属性的修改呢？这就需要借助于页目录表基址和页表基址了。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="页目录表基址"><a href="#页目录表基址" class="headerlink" title="页目录表基址"></a>页目录表基址</h2><p>结论：C0300000就是页目录表基址，接下来我们来验证这个结论。</p>
+<h3 id="C0300000拆分"><a href="#C0300000拆分" class="headerlink" title="C0300000拆分"></a>C0300000拆分</h3><p>C0300000： 1100 0000 0011 0000 0000 0000 0000 0000</p>
+<table>
+<thead>
+<tr>
+<th>每部分位数</th>
+<th>二进制</th>
+<th>十六进制</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10</td>
+<td>11 0000 0000</td>
+<td>300</td>
+</tr>
+<tr>
+<td>10</td>
+<td>11 0000 0000</td>
+<td>300</td>
+</tr>
+<tr>
+<td>12</td>
+<td>0000 0000 0000</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<h3 id="Cr3"><a href="#Cr3" class="headerlink" title="Cr3"></a>Cr3</h3><p>这里以记事本(notepad.exe)为例，来验证一下，C0300000就是页目录表基址，首先查看记事本对应的Cr3指向的物理地址。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-12-35-af0a5d5b7923dd573fb3d855028827d3-pdtCr3-78a409.png" alt="img"></p>
+<p>我们知道，Cr3指向的是PDT的首地址，这里可以看到4个PDE有值。</p>
+<h3 id="查看C0300000物理页"><a href="#查看C0300000物理页" class="headerlink" title="查看C0300000物理页"></a>查看C0300000物理页</h3><p>接下来的步骤就是比较熟悉的，根据拆分后的线性地址，寻找物理页的过程了。但是这一次，要慢点看。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-12-52-9cbeb02851de3f150542cb2966906361-pdtPde-3ea291.png" alt="img"></p>
+<p>这一步很容易理解，Cr3.base + 300*4，通过Cr3和线性地址的前10位，我们找到了PDE的值：7ea49063</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-03-9cbeb02851de3f150542cb2966906361-pdtPde-c1e116.png" alt="img"></p>
+<p>什么？又重复了一遍？实际上不是，由于PDE的值为7ea49063，后12位是属性位，因此，7ea49000是我们要找的PTT的首地址，然后通过PTT.base + 300*4，就得到了PTE的值：7ea49063。</p>
+<p>有了PTE的值，加上最后12位的偏移（此处为0），就可以找到物理页。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-21-a14aa5e484cdf9c52446f449fe68b380-pdtPte-9bc48f.png" alt="img"></p>
+<p>得到结果后，是不是很惊讶？C0300000这个<strong>线性地址对应的物理页上的物理地址</strong>，竟然和Cr3指向的物理地址完全一样！也就是说，以后不需要Cr3，只需在当前程序内，通过C0300000这个线性地址就可以得到当前程序PDT的首地址了</p>
+<h3 id="如何利用"><a href="#如何利用" class="headerlink" title="如何利用"></a>如何利用</h3><p>是啊，C0300000这个地址有啥用呢？当然有用，而且非常有用。回到文章开头的问题，我们该如何在不使用Windbg的情况下，修改物理页的属性呢？</p>
+<p>我们知道，想要修改物理页的属性，需要先修改物理页对应的PDE和PTE，那要如何找到PDE和PTE呢，由于<strong>在编写代码时，用到的都是线性地址</strong>，而C0300000这个线性地址刚好就可以找到PDT的首地址，这样我们拆分想要修改的物理页属性的线性地址，将前10位加上C0300000即可找到对应的PDE。</p>
+<p>既然PDE找到了，那不就有了PTT的首地址，这样PTE不也就可以找到了吗？并不是这样，尽管找到了PDE，但是由于<strong>PDE里面存着的是物理地址，如果直接访问PDE里面存的那个地址，在代码中会转变为一个线性地址</strong>，因此并不能通过PDE获取PTT的首地址，也就不能获取到PTE了，想要找到PTE，还得需要用到另外一个基地址，就是页表基址。</p>
+<h2 id="页表基址"><a href="#页表基址" class="headerlink" title="页表基址"></a>页表基址</h2><p>还是直接上结论，页表基址：C0000000</p>
+<p>接下来我们来验证。</p>
+<h3 id="C0000000拆分"><a href="#C0000000拆分" class="headerlink" title="C0000000拆分"></a>C0000000拆分</h3><p>C0000000： 1100 0000 0000 0000 0000 0000 0000 0000</p>
+<table>
+<thead>
+<tr>
+<th>每部分位数</th>
+<th>二进制</th>
+<th>十六进制</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10</td>
+<td>11 0000 0000</td>
+<td>300</td>
+</tr>
+<tr>
+<td>10</td>
+<td>00 0000 0000</td>
+<td>0</td>
+</tr>
+<tr>
+<td>12</td>
+<td>0000 0000 0000</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<h3 id="Cr3-1"><a href="#Cr3-1" class="headerlink" title="Cr3"></a>Cr3</h3><p>这里还是以记事本(notepad.exe)为例：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-43-93925f55bcc80aeec601d2b6fb776733-pttCr3-a7d53d.png" alt="img"></p>
+<p>我们查看Cr3指向的物理地址，当前共有4个PDE的有值的，而PDE的值，就是PTT的首地址，以第一个PDE（36c24067）为例，<strong>其中PTT的首地址为36c24000</strong>。</p>
+<h3 id="查看C0000000物理页"><a href="#查看C0000000物理页" class="headerlink" title="查看C0000000物理页"></a>查看C0000000物理页</h3><p>步骤和之前一样，就直接看结果好了。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-59-4a3cfbb23500f11b6115328b7352592e-pttPte-2f9739.png" alt="img"></p>
+<p>发现，C0000000这个线性地址所对应的物理页，刚好是36c24000，也就是第一个PDE对应的PTT的首地址。由此可以进一步推断，C0001000则是第二个PDE对应的PTT的首地址，以此类推。</p>
+<h2 id="再看10-10-12分页"><a href="#再看10-10-12分页" class="headerlink" title="再看10-10-12分页"></a>再看10-10-12分页</h2><p>现在再来看10-10-12分页时，看法就会有所不一样了。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-14-13-2ddf8fc54f95bffe55fbdd3b95417dbc-10-10-12-54e377.png" alt="img"></p>
+<ol>
+<li>实际上页表（PTT）被映射到了从0xC0000000到0xC03FFFFF的4M地址空间</li>
+<li>在这1024个表中有一张特殊的表：页目录表（PDT）</li>
+<li>页目录表（PDT）被映射到了0xC030000开始处的4KB大小的地址空间</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="有了0xC0300000和0xC0000000能做什么？"><a href="#有了0xC0300000和0xC0000000能做什么？" class="headerlink" title="有了0xC0300000和0xC0000000能做什么？"></a>有了0xC0300000和0xC0000000能做什么？</h3><p>掌握了这两个地址，就掌握了一个进程所有的物理内存读写权限。</p>
+<p>公式总结：</p>
+<ul>
+<li>什么是PDI和PTI？ 将32位线性地址拆分位10(PDI)-10(PTI)-12</li>
+<li>访问页目录表(PDT)的公式：0xC0300000 + PDI x 4</li>
+<li>访问页表(PTT)的公式：0xC0000000 + PDI x 1000 + PTI x 4（不用*号因为会被转义）</li>
+</ul>
+<h3 id="其它关于页的细节"><a href="#其它关于页的细节" class="headerlink" title="其它关于页的细节"></a>其它关于页的细节</h3><ul>
+<li>高2G有一些大页，即4MB页</li>
+<li>两个进程低2G几乎不同，高2G几乎相同</li>
+<li>一个进程低2G的内存空间，前64K与后64K是没有使用的（线性地址0 - 00010000 与 7FFF0000 - 7FFFFFFFF）</li>
+</ul>
+<h3 id="谁填充了这些表呢"><a href="#谁填充了这些表呢" class="headerlink" title="谁填充了这些表呢"></a>谁填充了这些表呢</h3><p><strong>进程本身可以通过0xC0300000和0xC0000000访问修改任意物理页</strong>，那么是谁为我们填充0xC0300000和0xC0000000的PDE与PTE呢？</p>
+<p>进程的创建过程：当创建B进程时，先在A进程中将B进程所有信息全部构建好，然后切换Cr3即可。也就是说，最开始的这张表是由A进程填充的。</p>
+]]></content>
+      <categories>
+        <category>保护模式</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+      </tags>
+  </entry>
 </search>
