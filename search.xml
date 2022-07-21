@@ -190,6 +190,40 @@
   </entry>
   <entry>
     <title></title>
+    <url>/2022/07/20/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
+    <content><![CDATA[<h1 id="任务门"><a href="#任务门" class="headerlink" title="任务门"></a>任务门</h1><h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
+<span id="more"></span>
+
+<p>简要概括，任务门有如下优势：</p>
+<ul>
+<li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
+<li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
+<li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
+</ul>
+<p>下面为不同表中，任务门进行任务切换的过程：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
+<h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
+<p>任务门描述符的结构非常简单，真正用到的只有24位，属性位里：DPL一般设置为3，方便应用程序访问，Type则是固定的0101，TSS段选择子，顾名思义，就是一个段选择子，指向位于GDT表中TSS段描述符的位置。其余位均为保留位，置0即可。</p>
+<h2 id="任务门实现任务切换"><a href="#任务门实现任务切换" class="headerlink" title="任务门实现任务切换"></a>任务门实现任务切换</h2><p>这一步十分简单，仅仅比使用TSS多了一个步骤而已，这里也不细讲了，直接上步骤。</p>
+<p>首先，编译源文件，下断点，确定TSS的地址，根据地址构造TSS段描述符：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structDesc.png"></p>
+<p>第二步，根据GDT表中构造好的TSS段描述符位置，在IDT表中构造任务门：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structSelect.png"></p>
+<p>第三步，在Windbg中使用!process 0 0指令确定CR3的值，并填入自己的TSS中：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
+<p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
+]]></content>
+      <categories>
+        <category>保护模式</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title></title>
     <url>/2022/07/21/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&amp;%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/</url>
     <content><![CDATA[<h1 id="页目录-amp-页表基址"><a href="#页目录-amp-页表基址" class="headerlink" title="页目录&amp;页表基址"></a>页目录&amp;页表基址</h1><blockquote>
 <p>考虑这样一个问题，我们现在可以通过在Windbg里找到线性地址所在的物理页，通过修改物理页的属性，就可以实现一些原本受限的功能。例如将常量区对应的物理页R&#x2F;W属性修改为1，便可以修改位于常量区的元素。</p>
@@ -291,40 +325,6 @@
 </ul>
 <h3 id="谁填充了这些表呢"><a href="#谁填充了这些表呢" class="headerlink" title="谁填充了这些表呢"></a>谁填充了这些表呢</h3><p><strong>进程本身可以通过0xC0300000和0xC0000000访问修改任意物理页</strong>，那么是谁为我们填充0xC0300000和0xC0000000的PDE与PTE呢？</p>
 <p>进程的创建过程：当创建B进程时，先在A进程中将B进程所有信息全部构建好，然后切换Cr3即可。也就是说，最开始的这张表是由A进程填充的。</p>
-]]></content>
-      <categories>
-        <category>保护模式</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title></title>
-    <url>/2022/07/20/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
-    <content><![CDATA[<h1 id="任务门"><a href="#任务门" class="headerlink" title="任务门"></a>任务门</h1><h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
-<span id="more"></span>
-
-<p>简要概括，任务门有如下优势：</p>
-<ul>
-<li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
-<li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
-<li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
-</ul>
-<p>下面为不同表中，任务门进行任务切换的过程：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
-<h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
-<p>任务门描述符的结构非常简单，真正用到的只有24位，属性位里：DPL一般设置为3，方便应用程序访问，Type则是固定的0101，TSS段选择子，顾名思义，就是一个段选择子，指向位于GDT表中TSS段描述符的位置。其余位均为保留位，置0即可。</p>
-<h2 id="任务门实现任务切换"><a href="#任务门实现任务切换" class="headerlink" title="任务门实现任务切换"></a>任务门实现任务切换</h2><p>这一步十分简单，仅仅比使用TSS多了一个步骤而已，这里也不细讲了，直接上步骤。</p>
-<p>首先，编译源文件，下断点，确定TSS的地址，根据地址构造TSS段描述符：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structDesc.png"></p>
-<p>第二步，根据GDT表中构造好的TSS段描述符位置，在IDT表中构造任务门：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structSelect.png"></p>
-<p>第三步，在Windbg中使用!process 0 0指令确定CR3的值，并填入自己的TSS中：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
-<p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
 ]]></content>
       <categories>
         <category>保护模式</category>
