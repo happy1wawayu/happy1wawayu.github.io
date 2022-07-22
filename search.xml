@@ -1,106 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
-    <title>10-10-12分页</title>
-    <url>/2022/07/17/10-10-12%E5%88%86%E9%A1%B5/</url>
-    <content><![CDATA[<blockquote>
-<p>保护模式下内存管理方式分为两种，段与页。</p>
-<p>前面的篇章中，简要介绍了段的知识，今天就来和大家聊聊页的知识，页是保护模式中更为重要的一环，随着系统进入32-Bit，段的作用明显降低了，取而代之的则是在段的基础上，更为细分的页。</p>
-</blockquote>
-<h2 id="段与页"><a href="#段与页" class="headerlink" title="段与页"></a>段与页</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/segAndPage.png"></p>
-<p>这是Intel白皮书中介绍关于段与页的概要图，经过段的学习，可以很容易的理解左半部分，这是一个根据所提供的<strong>有效地址（图中Offset）</strong>以及段寄存器中确定的基址，锁定线性地址空间中的某个<strong>线性地址（Linear Address）</strong>的过程。而右半部分，则是利用了页的功能，通过拆分<strong>线性地址</strong>，一步步转化成了<strong>物理地址</strong>。</p>
-<p>上述提到了3个概念，有效地址，线性地址以及物理地址，文字叙述会让人混淆，我们来看一条语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; 0x12345678是**有效地址**</span><br><span class="line">; ds.Base + 0x12345678是**线性地址**</span><br><span class="line">mov dword ptr ds:[0x12345678], 0x123</span><br></pre></td></tr></table></figure>
-
-<p>这都非常好理解，那什么是物理地址呢？考虑这样一个问题，掌握3环知识的小伙伴们知道每个进程都有4GB的内存空间，这时如果有一个进程A，给会进行一个操作，给<code>ds.Base + 0x12345678</code>赋值<code>0x123</code>，还有一个进程B，同样会给<code>ds.Base + 0x12345678</code>赋值<code>0x123</code>，那么<code>ds.Base + 0x12345678</code>处的位置到底是哪个值呢？还是两者都不是呢？这就涉及到了物理地址的概念。</p>
-<h2 id="PDT与PTT"><a href="#PDT与PTT" class="headerlink" title="PDT与PTT"></a>PDT与PTT</h2><p>每个进程都有一个CR3的值，CR3是什么？实际之前在TSS切换时也用到了，具体等到了控制寄存器那会详细分析。简单来说，CR3被用来<strong>切换和定位当前正在使用的页表</strong>，它是一个32位的寄存器，其中高20位指向一个<strong>物理页</strong>（Windows系统上，一个页的大小是4KB，也就是4096个字节），如下图所示：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/pdtAndPtt.png"></p>
-<p>这图该怎么看呢？首先CR3会指向一个物理页，这个物理页又叫做<strong>页目录表（PDT）</strong>，页目录表每个元素叫做<strong>页目录表项（PDE）</strong>，页目录表项，每个4字节，所以一共有<strong>1024个</strong>页目录表项，CR3就好比一本书，PDT就是这本书的目录，PDE就是章节，这是一本有1024个章节的书（哇塞，真厚啊U•ェ•*U），这样就好理解多了。这是第一级。</p>
-<p>页目录表项又指向一个第二级的表，叫做<strong>页表（PTT）</strong>，页表的大小也是4KB，页表中的每个元素叫做<strong>页表项（PTE）</strong>。页表项可以理解为书中章节的每个小节，就好比第一章里面有1024个小节，这个小节就是PTE，这1024个小节加起来，构成一个小节表，就是PTT。</p>
-<p>第二级介绍完了，第三级也就好理解了，既然书中每个章节的每个小节理解了，接下来就是页码了，每个小节都会对应书中的某个页码。而这个页码，就是相当于的物理页了。这样就可以理解这张图了，就是一部部找到物理页。</p>
-<h2 id="10-10-12分页"><a href="#10-10-12分页" class="headerlink" title="10-10-12分页"></a>10-10-12分页</h2><p>Windows采用三种分页方式，在32位系统上主要有10-10-12分页和2-9-9-12分页这两种方式，在64位系统上增加了9-9-9-9-12这种分页方式，后面的文章会依次介绍32位下的两种分页方式。首先从10-10-12开始。</p>
-<p>首先修改C盘的boot.ini文件，将noexecute改成execute，重启虚拟机，即可使用10-10-12分页方式</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/boot.png">10-10-12分页是如何工作的呢？来看一个简单的程序：</p>
-<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stdafx.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="type">int</span> a = <span class="number">0x123</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;%x&quot;</span>, &amp;a);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这个程序很简单，给a赋值0x123，并查看a的地址</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/find.png"></p>
-<p>而这个地址<code>0x12ff7c</code>，实际上就是前文提到的线性地址，接下来我们将这个32位的地址按照10-10-12的方式进行拆分：</p>
-<ol>
-<li><p>将<code>0x12ff7c</code>拆分成二进制：0000 0000 0001 0010 1111 1111 0111 1100</p>
-</li>
-<li><p>将这32位二进制数，按照10-10-12的方式组合：</p>
-</li>
-</ol>
-<table>
-<thead>
-<tr>
-<th>每部分位数</th>
-<th>二进制</th>
-<th>十六进制</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>10</td>
-<td>0000 0000 00</td>
-<td>0</td>
-</tr>
-<tr>
-<td>10</td>
-<td>01 0010 1111</td>
-<td>12f</td>
-</tr>
-<tr>
-<td>12</td>
-<td>1111 0111 1100</td>
-<td>f7c</td>
-</tr>
-</tbody></table>
-<ol start="3">
-<li>根据Cr3找到页目录表（PDT）中的页目录表项（PDE）：</li>
-</ol>
-<p>首先在Windbg中执行!process 0 0指令，找到当前程序的Cr3，Cr3的值指向的就是页目录表的首地址。由于第一部分值为0，所以要查找的PDE，需要用Cr3+0*4(乘4是因为每个PDE大小是4字节)，这里注意一下，由于查找的是物理地址，所以使用的是!dd指令。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-29-26-0c66892caef6ea7fbf26de4b76cd9055-findPDE-33635a.png"></p>
-<ol start="4">
-<li>根据PDE找到页表（PTT）中的页表项（PTE）：</li>
-</ol>
-<p>上一步已经找到了PDE，PDE的值指向的是某个PTT的首地址，方法和上一步一样，用PDE中的值+12f(拆分完的第二部分)x4，就可以得到PTE，这里要注意一点，将PDE中的值代入时，<strong>后12位置0</strong>，由于后12位为属性位，在<strong>查找的过程中</strong>不起作用</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-29-46-47d90e24438239f625efc3c3a1e8305c-findPTE-ed0e73.png"></p>
-<ol start="5">
-<li>根据PTE确定物理地址：</li>
-</ol>
-<p>确定PTE后，就剩最后一步了。由于一个物理页的大小本身就是4KB，也就是2的12次方，所以当<strong>确定了前20位后也就确定了物理页</strong>，因此我们要找的内容就在<code>219da000</code>这个物理页上的某个物理地址。这个物理页的范围是<code>219da000</code>~&#96;219dafff&#96;。现在可以理解，<strong>PTE指向的是一个物理页的首地址</strong>，根据最后12位的来确定，我们要寻找的值在物理页上的偏移，也就真正的找到了这个物理地址。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-30-16-058494a946a0569de127d5cf18b45537-findPhyAddr-5aa14d.png"></p>
-<p>根据实验截图，发现我们一开始存在变量a里面的<code>0x123</code>，真正存的地方在<code>0x219daf7c</code>这个物理地址的位置，这就是通过线性地址一步步的找过来的，这些工作都是CPU做的，比如当我们读取a这个地址上的值是，CPU会通过分页机制读取该物理地址的值，然后再显示出来。</p>
-<h2 id="有趣的实验"><a href="#有趣的实验" class="headerlink" title="有趣的实验"></a>有趣的实验</h2><h3 id="读错值了？"><a href="#读错值了？" class="headerlink" title="读错值了？"></a>读错值了？</h3><p>有了10-10-12分页的知识，来做一个有趣的小实验</p>
-<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stdafx.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="type">int</span> a = <span class="number">0x123</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;%x&quot;</span>, &amp;a);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;%x&quot;</span>, *(&amp;a));</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这个代码非常简单，一般人认为，会先输出a的地址，然后再输出<code>0x123</code>。但有了物理页的知识，我们就可以做一些手脚了。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-31-32-11f2a7357b3af11c46877a202add96b8-modifyCode-32aab3.png"></p>
-<p>很奇怪吧？为什么输出不是<code>0x123</code>，而却输出<code>0x456</code>呢？原因就在于，我们偷偷修改了变量的物理地址上的值，将原本的<code>0x123</code>改成了<code>0x456</code>，因此，CPU再次去物理页读取时，值已经发生了变化，读到了修改后的值。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-31-43-8d555eec52ae6e0d870b19d69417a22a-modifyWin-8a1832.png"></p>
-<h3 id="0地址也能存值？"><a href="#0地址也能存值？" class="headerlink" title="0地址也能存值？"></a>0地址也能存值？</h3><figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stdafx.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="type">int</span> a = <span class="number">1</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;%x&quot;</span>, &amp;a);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	</span><br><span class="line">	*(<span class="type">int</span>*)<span class="number">0</span> = <span class="number">0x123</span>;</span><br><span class="line"></span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;address0: %x&quot;</span>, *(<span class="type">int</span>*)<span class="number">0</span>);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这是个显而易见运行会失败的程序，为什么？因为你给0地址赋值了，有点C&#x2F;C++开发经验的人都知道，0地址是不能存值的，为什么？因为运行不过去啊！这不扯淡嘛！你看我就运行过去了！</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-32-05-0ebea905984bbb581c352912af0b93ef-store0Code-77ecc0.png"></p>
-<p>这又是为什么呢？其实0地址不能存值的原因是，没有给它挂物理页，既然没有物理页，那CPU按照分页去查的时候，就查不到了；那么只要给他挂个物理页，就可以给这个线性地址存值了，具体操作如下。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-32-48-64b85154cebf8cae111729d32a30240f-store0Win-f07c9c.png"></p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><ol>
-<li>一张页表能包含的物理页：1024*KB &#x3D; 4MB</li>
-<li>10-10-12分页共有1024张页表：1024*4MB &#x3D; 4GB</li>
-<li>前20位的值如果相同，那么一定在同一个物理页</li>
-<li>一个PTE最多可以指向一个物理页；PTE可以没有物理页；多个PTE可以指向同一个物理页</li>
-</ol>
-]]></content>
-      <categories>
-        <category>保护模式</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>任务状态段</title>
     <url>/2022/07/20/%E4%BB%BB%E5%8A%A1%E7%8A%B6%E6%80%81%E6%AE%B5%EF%BC%88TSS%EF%BC%89/</url>
     <content><![CDATA[<blockquote>
@@ -207,6 +107,106 @@
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
 <p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
+]]></content>
+      <categories>
+        <category>保护模式</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>10-10-12分页</title>
+    <url>/2022/07/17/10-10-12%E5%88%86%E9%A1%B5/</url>
+    <content><![CDATA[<blockquote>
+<p>保护模式下内存管理方式分为两种，段与页。</p>
+<p>前面的篇章中，简要介绍了段的知识，今天就来和大家聊聊页的知识，页是保护模式中更为重要的一环，随着系统进入32-Bit，段的作用明显降低了，取而代之的则是在段的基础上，更为细分的页。</p>
+</blockquote>
+<h2 id="段与页"><a href="#段与页" class="headerlink" title="段与页"></a>段与页</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/segAndPage.png"></p>
+<p>这是Intel白皮书中介绍关于段与页的概要图，经过段的学习，可以很容易的理解左半部分，这是一个根据所提供的<strong>有效地址（图中Offset）</strong>以及段寄存器中确定的基址，锁定线性地址空间中的某个<strong>线性地址（Linear Address）</strong>的过程。而右半部分，则是利用了页的功能，通过拆分<strong>线性地址</strong>，一步步转化成了<strong>物理地址</strong>。</p>
+<p>上述提到了3个概念，有效地址，线性地址以及物理地址，文字叙述会让人混淆，我们来看一条语句：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; 0x12345678是**有效地址**</span><br><span class="line">; ds.Base + 0x12345678是**线性地址**</span><br><span class="line">mov dword ptr ds:[0x12345678], 0x123</span><br></pre></td></tr></table></figure>
+
+<p>这都非常好理解，那什么是物理地址呢？考虑这样一个问题，掌握3环知识的小伙伴们知道每个进程都有4GB的内存空间，这时如果有一个进程A，给会进行一个操作，给<code>ds.Base + 0x12345678</code>赋值<code>0x123</code>，还有一个进程B，同样会给<code>ds.Base + 0x12345678</code>赋值<code>0x123</code>，那么<code>ds.Base + 0x12345678</code>处的位置到底是哪个值呢？还是两者都不是呢？这就涉及到了物理地址的概念。</p>
+<h2 id="PDT与PTT"><a href="#PDT与PTT" class="headerlink" title="PDT与PTT"></a>PDT与PTT</h2><p>每个进程都有一个CR3的值，CR3是什么？实际之前在TSS切换时也用到了，具体等到了控制寄存器那会详细分析。简单来说，CR3被用来<strong>切换和定位当前正在使用的页表</strong>，它是一个32位的寄存器，其中高20位指向一个<strong>物理页</strong>（Windows系统上，一个页的大小是4KB，也就是4096个字节），如下图所示：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/pdtAndPtt.png"></p>
+<p>这图该怎么看呢？首先CR3会指向一个物理页，这个物理页又叫做<strong>页目录表（PDT）</strong>，页目录表每个元素叫做<strong>页目录表项（PDE）</strong>，页目录表项，每个4字节，所以一共有<strong>1024个</strong>页目录表项，CR3就好比一本书，PDT就是这本书的目录，PDE就是章节，这是一本有1024个章节的书（哇塞，真厚啊U•ェ•*U），这样就好理解多了。这是第一级。</p>
+<p>页目录表项又指向一个第二级的表，叫做<strong>页表（PTT）</strong>，页表的大小也是4KB，页表中的每个元素叫做<strong>页表项（PTE）</strong>。页表项可以理解为书中章节的每个小节，就好比第一章里面有1024个小节，这个小节就是PTE，这1024个小节加起来，构成一个小节表，就是PTT。</p>
+<p>第二级介绍完了，第三级也就好理解了，既然书中每个章节的每个小节理解了，接下来就是页码了，每个小节都会对应书中的某个页码。而这个页码，就是相当于的物理页了。这样就可以理解这张图了，就是一部部找到物理页。</p>
+<h2 id="10-10-12分页"><a href="#10-10-12分页" class="headerlink" title="10-10-12分页"></a>10-10-12分页</h2><p>Windows采用三种分页方式，在32位系统上主要有10-10-12分页和2-9-9-12分页这两种方式，在64位系统上增加了9-9-9-9-12这种分页方式，后面的文章会依次介绍32位下的两种分页方式。首先从10-10-12开始。</p>
+<p>首先修改C盘的boot.ini文件，将noexecute改成execute，重启虚拟机，即可使用10-10-12分页方式</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/boot.png">10-10-12分页是如何工作的呢？来看一个简单的程序：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stdafx.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="type">int</span> a = <span class="number">0x123</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;%x&quot;</span>, &amp;a);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个程序很简单，给a赋值0x123，并查看a的地址</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/find.png"></p>
+<p>而这个地址<code>0x12ff7c</code>，实际上就是前文提到的线性地址，接下来我们将这个32位的地址按照10-10-12的方式进行拆分：</p>
+<ol>
+<li><p>将<code>0x12ff7c</code>拆分成二进制：0000 0000 0001 0010 1111 1111 0111 1100</p>
+</li>
+<li><p>将这32位二进制数，按照10-10-12的方式组合：</p>
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>每部分位数</th>
+<th>二进制</th>
+<th>十六进制</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10</td>
+<td>0000 0000 00</td>
+<td>0</td>
+</tr>
+<tr>
+<td>10</td>
+<td>01 0010 1111</td>
+<td>12f</td>
+</tr>
+<tr>
+<td>12</td>
+<td>1111 0111 1100</td>
+<td>f7c</td>
+</tr>
+</tbody></table>
+<ol start="3">
+<li>根据Cr3找到页目录表（PDT）中的页目录表项（PDE）：</li>
+</ol>
+<p>首先在Windbg中执行!process 0 0指令，找到当前程序的Cr3，Cr3的值指向的就是页目录表的首地址。由于第一部分值为0，所以要查找的PDE，需要用Cr3+0*4(乘4是因为每个PDE大小是4字节)，这里注意一下，由于查找的是物理地址，所以使用的是!dd指令。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-29-26-0c66892caef6ea7fbf26de4b76cd9055-findPDE-33635a.png"></p>
+<ol start="4">
+<li>根据PDE找到页表（PTT）中的页表项（PTE）：</li>
+</ol>
+<p>上一步已经找到了PDE，PDE的值指向的是某个PTT的首地址，方法和上一步一样，用PDE中的值+12f(拆分完的第二部分)x4，就可以得到PTE，这里要注意一点，将PDE中的值代入时，<strong>后12位置0</strong>，由于后12位为属性位，在<strong>查找的过程中</strong>不起作用</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-29-46-47d90e24438239f625efc3c3a1e8305c-findPTE-ed0e73.png"></p>
+<ol start="5">
+<li>根据PTE确定物理地址：</li>
+</ol>
+<p>确定PTE后，就剩最后一步了。由于一个物理页的大小本身就是4KB，也就是2的12次方，所以当<strong>确定了前20位后也就确定了物理页</strong>，因此我们要找的内容就在<code>219da000</code>这个物理页上的某个物理地址。这个物理页的范围是<code>219da000</code>~&#96;219dafff&#96;。现在可以理解，<strong>PTE指向的是一个物理页的首地址</strong>，根据最后12位的来确定，我们要寻找的值在物理页上的偏移，也就真正的找到了这个物理地址。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-30-16-058494a946a0569de127d5cf18b45537-findPhyAddr-5aa14d.png"></p>
+<p>根据实验截图，发现我们一开始存在变量a里面的<code>0x123</code>，真正存的地方在<code>0x219daf7c</code>这个物理地址的位置，这就是通过线性地址一步步的找过来的，这些工作都是CPU做的，比如当我们读取a这个地址上的值是，CPU会通过分页机制读取该物理地址的值，然后再显示出来。</p>
+<h2 id="有趣的实验"><a href="#有趣的实验" class="headerlink" title="有趣的实验"></a>有趣的实验</h2><h3 id="读错值了？"><a href="#读错值了？" class="headerlink" title="读错值了？"></a>读错值了？</h3><p>有了10-10-12分页的知识，来做一个有趣的小实验</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stdafx.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="type">int</span> a = <span class="number">0x123</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;%x&quot;</span>, &amp;a);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;%x&quot;</span>, *(&amp;a));</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个代码非常简单，一般人认为，会先输出a的地址，然后再输出<code>0x123</code>。但有了物理页的知识，我们就可以做一些手脚了。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-31-32-11f2a7357b3af11c46877a202add96b8-modifyCode-32aab3.png"></p>
+<p>很奇怪吧？为什么输出不是<code>0x123</code>，而却输出<code>0x456</code>呢？原因就在于，我们偷偷修改了变量的物理地址上的值，将原本的<code>0x123</code>改成了<code>0x456</code>，因此，CPU再次去物理页读取时，值已经发生了变化，读到了修改后的值。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-31-43-8d555eec52ae6e0d870b19d69417a22a-modifyWin-8a1832.png"></p>
+<h3 id="0地址也能存值？"><a href="#0地址也能存值？" class="headerlink" title="0地址也能存值？"></a>0地址也能存值？</h3><figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stdafx.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="type">int</span> a = <span class="number">1</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;%x&quot;</span>, &amp;a);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	</span><br><span class="line">	*(<span class="type">int</span>*)<span class="number">0</span> = <span class="number">0x123</span>;</span><br><span class="line"></span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;address0: %x&quot;</span>, *(<span class="type">int</span>*)<span class="number">0</span>);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这是个显而易见运行会失败的程序，为什么？因为你给0地址赋值了，有点C&#x2F;C++开发经验的人都知道，0地址是不能存值的，为什么？因为运行不过去啊！这不扯淡嘛！你看我就运行过去了！</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-32-05-0ebea905984bbb581c352912af0b93ef-store0Code-77ecc0.png"></p>
+<p>这又是为什么呢？其实0地址不能存值的原因是，没有给它挂物理页，既然没有物理页，那CPU按照分页去查的时候，就查不到了；那么只要给他挂个物理页，就可以给这个线性地址存值了，具体操作如下。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-17-22-32-48-64b85154cebf8cae111729d32a30240f-store0Win-f07c9c.png"></p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><ol>
+<li>一张页表能包含的物理页：1024*KB &#x3D; 4MB</li>
+<li>10-10-12分页共有1024张页表：1024*4MB &#x3D; 4GB</li>
+<li>前20位的值如果相同，那么一定在同一个物理页</li>
+<li>一个PTE最多可以指向一个物理页；PTE可以没有物理页；多个PTE可以指向同一个物理页</li>
+</ol>
 ]]></content>
       <categories>
         <category>保护模式</category>
