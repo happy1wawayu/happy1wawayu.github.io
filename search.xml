@@ -2,7 +2,7 @@
 <search>
   <entry>
     <title>10-10-12分页</title>
-    <url>/2022/07/17/10-10-12%E5%88%86%E9%A1%B5/</url>
+    <url>/2022/03/18/10-10-12%E5%88%86%E9%A1%B5/</url>
     <content><![CDATA[<blockquote>
 <p>保护模式下内存管理方式分为两种，段与页。</p>
 <p>前面的篇章中，简要介绍了段的知识，今天就来和大家聊聊页的知识，页是保护模式中更为重要的一环，随着系统进入32-Bit，段的作用明显降低了，取而代之的则是在段的基础上，更为细分的页。</p>
@@ -103,7 +103,7 @@
   </entry>
   <entry>
     <title>2-9-9-12分页</title>
-    <url>/2022/07/23/2-9-9-12%E5%88%86%E9%A1%B5/</url>
+    <url>/2022/03/22/2-9-9-12%E5%88%86%E9%A1%B5/</url>
     <content><![CDATA[<p>在前面的文章中主要介绍了10-10-12分页方式，在这种分页方式下，物理地址最多可达4GB。随着硬件发展，4GB的物理地址范围已经无法满足要求，于是Intel设计了一种新的分页方式：2-9-9-12分页（又称PAE）分页。下面就来了解一下这种分页方式是如何运作的吧。</p>
 <h2 id="PAE分页"><a href="#PAE分页" class="headerlink" title="PAE分页"></a>PAE分页</h2><h3 id="为什么是2-9-9-12"><a href="#为什么是2-9-9-12" class="headerlink" title="为什么是2-9-9-12"></a>为什么是2-9-9-12</h3><p>PAE（Physical Address Extension，物理地址扩展）页，一定会涉及到2个结构，就是PDE和PTE。以PTE来说，它可以直接定位到某个物理页上的物理地址，在10-10-12分页下，由于PTE的大小是4字节(32位)，因此PTE能够寻址的范围仅有4GB。设想，若PTE有33位，那便可以寻址8GB；34位就能寻址16GB……以此类推。Intel考虑到对齐的因素，就干脆直接让PTE的长度达到64位了。这样一个PTE的大小就8字节，又因为一个PTT表的大小是4KB(4096字节)，因此原本一个PTT表里能装下1024个4字节的PTE，现在只能装下512个8字节的PTE了。2的9次方等于512，所以PTI的值为9。</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-18-14-633bdc3b36aec369d0dcf755f7019467-2022-07-23-12-18-10-633bdc3b36aec369d0dcf755f7019467-pti9-7837ad-b483ab.png"></p>
@@ -155,7 +155,7 @@
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">80511987 8b4d08          mov     ecx,dword ptr [ebp+8]	//获取参数</span><br><span class="line">8051198a 56              push    esi	</span><br><span class="line">8051198b 8bc1            mov     eax,ecx</span><br><span class="line">8051198d c1e812          shr     eax,12h		//右移18位</span><br><span class="line">80511990 bef83f0000      mov     esi,3FF8h	</span><br><span class="line">80511995 23c6            and     eax,esi		//进行与运算，余下11位有效位</span><br><span class="line">80511997 2d0000a03f      sub     eax,3FA00000h		//相当于add eax, 0xC0600000</span><br><span class="line">8051199c 8b10            mov     edx,dword ptr [eax]	//取PDE低四字节</span><br><span class="line">8051199e 8b4004          mov     eax,dword ptr [eax+4]	//取PDE高四字节</span><br><span class="line">805119a1 8945fc          mov     dword ptr [ebp-4],eax	//高四字节保存到局部变量</span><br><span class="line">805119a4 8bc2            mov     eax,edx</span><br><span class="line">805119a6 57              push    edi			//保存edi原本的值</span><br><span class="line">805119a7 83e001          and     eax,1			//保留P位的值</span><br><span class="line">805119aa 33ff            xor     edi,edi</span><br><span class="line">805119ac 0bc7            or      eax,edi</span><br></pre></td></tr></table></figure>
 
 <ul>
-<li>右移18位后，进行了一次与运算，保留的位相当于PDPI x 4KB + PDI x 8（看不明白的可以<a href="https://cataloc.gitee.io/blog/2020/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/#%E5%B7%A7%E5%A6%99%E7%9A%84%E4%B8%8E%E8%BF%90%E7%AE%97%EF%BC%9A">参考这篇</a>）</li>
+<li>右移18位后，进行了一次与运算，保留的位相当于PDPI x 4KB + PDI x 8（看不明白的可以<a href="https://happy1wawayu.github.io/blog/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/#%E5%B7%A7%E5%A6%99%E7%9A%84%E4%B8%8E%E8%BF%90%E7%AE%97%EF%BC%9A">参考这篇</a>）</li>
 <li>sub eax, 0x3FA00000和add eax, 0xC0600000，因此可以推测，<strong>PAE分页下PDT的基址为0xC0600000</strong></li>
 </ul>
 <p>接着分析查找PTE的部分</p>
@@ -177,7 +177,7 @@
 </ol>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">pPDE = (int*)(0xc0600000 + (PDPTI&lt;&lt;12) + (PDI&lt;&lt;3))</span><br><span class="line">pPTE = (int*)(0xc0000000 + (PDPTI&lt;&lt;21) + (PDI&lt;&lt;12) + (PTI&lt;&lt;3))</span><br></pre></td></tr></table></figure>
 
-<h2 id="修改常量区"><a href="#修改常量区" class="headerlink" title="修改常量区"></a>修改常量区</h2><p>在10-10-12分页学习的时候，我们知道通过修改物理页属性，可以使得程序能够修改常量区里的内容。并且在<a href="https://cataloc.gitee.io/blog/2020/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/">基址小实验</a>那篇中，通过代码实现了修改常量区的操作，利用了基址，从而可以在代码中通过线性地址找到PDE和PTE。这里，在PAE分页下，重做一遍那个实验，原理一样，就不在此赘述了。</p>
+<h2 id="修改常量区"><a href="#修改常量区" class="headerlink" title="修改常量区"></a>修改常量区</h2><p>在10-10-12分页学习的时候，我们知道通过修改物理页属性，可以使得程序能够修改常量区里的内容。并且在<a href="https://happy1wawayu.github.io/blog/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/">基址小实验</a>那篇中，通过代码实现了修改常量区的操作，利用了基址，从而可以在代码中通过线性地址找到PDE和PTE。这里，在PAE分页下，重做一遍那个实验，原理一样，就不在此赘述了。</p>
 <p>首先，直接修改位于常量区的“protect”失败</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-13-39-9e8c4c7f4c98db656730151cacc3d497-constBefore-cd4b4f.png"></p>
 <p>这里采用拆分线性地址的方式计算PDE&#x2F;PTT的具体位置，拆分“protect”所在的线性地址0x423034 -&gt; 0-2-0x23-0x34</p>
@@ -201,8 +201,119 @@
       </tags>
   </entry>
   <entry>
-    <title>任务状态段</title>
-    <url>/2022/07/20/%E4%BB%BB%E5%8A%A1%E7%8A%B6%E6%80%81%E6%AE%B5%EF%BC%88TSS%EF%BC%89/</url>
+    <title>基址小实验（10-10-12）</title>
+    <url>/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/</url>
+    <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过C0300000和C0000000这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
+<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
+<h2 id="测试原始代码"><a href="#测试原始代码" class="headerlink" title="测试原始代码"></a>测试原始代码</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-06-946691fd700d1b1c1e8d4d29276e8289-before-414890.png"></p>
+<p>首先测试原始代码，发现直接修改常量区的字符串，是会失败的</p>
+<h2 id="提权进入0环"><a href="#提权进入0环" class="headerlink" title="提权进入0环"></a>提权进入0环</h2><p>提权这里还是会用到Windbg，根据调用函数的地址，填入段选择子，并通过调用门进行提权（就当复习调用门知识了）</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-13-54-05021cd34209ff0f52323592744b5199-addr-5603f1.png"> </p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-35-144d87388db62a38ec244f39dcc05dbc-windbg-c764d6.png"></p>
+<h2 id="修改R-x2F-W位"><a href="#修改R-x2F-W位" class="headerlink" title="修改R&#x2F;W位"></a>修改R&#x2F;W位</h2><p>提权进入0环后（为啥要提权呢？因为C0300000&#x2F;C0000000都属于高2G的线性地址，3环没法直接访问），就到了我们最关键的步骤了，修改R&#x2F;W位。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">temp = *(int*)0xC0300004;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC0300004 = temp;</span><br><span class="line">temp = *(int*)0xC000108C;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC000108C = temp;</span><br></pre></td></tr></table></figure>
+
+<p>在这之前声明了一个中间变量temp（int类型）。</p>
+<p>具体步骤：</p>
+<ol>
+<li>打印出字符串所在常量区的地址0x423fb0，进行拆分：10-10-12 -&gt; 0x1-0x23-0xfb0</li>
+<li>PDI &#x3D; 0x1，带入公式：PDE &#x3D; C0300000 + 0x1 x 4</li>
+<li>PTI &#x3D; 0x23，带入公式：PTE &#x3D; C0000000 + 0x1 x 1000 + 0x23 x 4</li>
+<li>分别取PDE和PTE处的值，并<strong>和0x2进行或运算（将R&#x2F;W位置1）</strong></li>
+</ol>
+<p>这样就完成了对R&#x2F;W位的修改，在接下来再次对常量区的值进行修改操作时，便可以成功。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-46-50-05a67d4539354f9f4778a64126020e49-after-7736fd.png"></p>
+<h2 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int temp;</span><br><span class="line"></span><br><span class="line">__declspec(naked) void ModifyRW() &#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		pushad</span><br><span class="line">		pushfd</span><br><span class="line">	&#125;</span><br><span class="line">	temp = *(int*)0xC0300004;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC0300004 = temp;</span><br><span class="line">	temp = *(int*)0xC000108C;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC000108C = temp;</span><br><span class="line">	</span><br><span class="line">	__asm &#123;</span><br><span class="line">		popfd</span><br><span class="line">		popad</span><br><span class="line">		retf</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;; </span><br><span class="line">	char buffer[6] = &#123;0, 0, 0, 0, 0x4B, 0&#125;;</span><br><span class="line">	printf(&quot;addr: %x, str: %s&quot;, str, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line">	printf(&quot;str: %s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>任务门</title>
+    <url>/2022/03/17/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
+    <content><![CDATA[<h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
+<p>简要概括，任务门有如下优势：</p>
+<ul>
+<li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
+<li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
+<li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
+</ul>
+<p>下面为不同表中，任务门进行任务切换的过程：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
+<h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
+<p>任务门描述符的结构非常简单，真正用到的只有24位，属性位里：DPL一般设置为3，方便应用程序访问，Type则是固定的0101，TSS段选择子，顾名思义，就是一个段选择子，指向位于GDT表中TSS段描述符的位置。其余位均为保留位，置0即可。</p>
+<h2 id="任务门实现任务切换"><a href="#任务门实现任务切换" class="headerlink" title="任务门实现任务切换"></a>任务门实现任务切换</h2><p>这一步十分简单，仅仅比使用TSS多了一个步骤而已，这里也不细讲了，直接上步骤。</p>
+<p>首先，编译源文件，下断点，确定TSS的地址，根据地址构造TSS段描述符：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structDesc.png"></p>
+<p>第二步，根据GDT表中构造好的TSS段描述符位置，在IDT表中构造任务门：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structSelect.png"></p>
+<p>第三步，在Windbg中使用!process 0 0指令确定CR3的值，并填入自己的TSS中：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
+<p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>逆向分析MmIsAddressValid（10-10-12）</title>
+    <url>/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid(10-10-12)/</url>
+    <content><![CDATA[<p>在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">kd&gt; u MmIsAddressValid</span><br></pre></td></tr></table></figure>
+
+<p>查看。</p>
+<p>为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的MmIsAddressValid函数，就利用了这么一个原理，相比前一篇的基址小实验，这里对于线性地址拆分的过程更为巧妙，让我们一起来看看吧！</p>
+<h2 id="获取PDE属性"><a href="#获取PDE属性" class="headerlink" title="获取PDE属性"></a>获取PDE属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-04-35-dad27cbe16aabf5c4d005018b697acc7-original-ac218c.png"></p>
+<p>首先观察函数主体部分，发现代码并不长，但是有很多跳转，具体跳转内容就不作分析了，主要是分析函数主体：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4661 8bff            mov     edi,edi		//hotpatch</span><br><span class="line">804e4663 55              push    ebp</span><br><span class="line">804e4664 8bec            mov     ebp,esp</span><br><span class="line">804e4666 8b4d08          mov     ecx,dword ptr [ebp+8]	//取第一个参数（线性地址）</span><br><span class="line">804e4669 8bc1            mov     eax,ecx		//赋值到中间变量，方便运算</span><br><span class="line">804e466b c1e814          shr     eax,14h		//逻辑右移20位</span><br><span class="line">804e466e bafc0f0000      mov     edx,0FFCh				</span><br><span class="line">804e4673 23c2            and     eax,edx		//和操作数进行与运算，同时清空最后2位；相当于做了一个乘4的运算，既左移2位</span><br><span class="line">804e4675 2d0000d03f      sub     eax,3FD00000h		//进行减法运算，相当于eax+0xC0300000</span><br><span class="line">804e467a 8b00            mov     eax,dword ptr [eax]	//取PDE的值</span><br><span class="line">804e467c a801            test    al,1			//判断PDE属性P位是否为1</span><br><span class="line">804e467e 0f84d2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e4684 84c0            test    al,al			//判断下标为7的位(PS位)值是否为1</span><br><span class="line">804e4686 7824            js      nt!MmIsAddressValid+0x53 (804e46ac)</span><br></pre></td></tr></table></figure>
+
+<h3 id="巧妙的与运算："><a href="#巧妙的与运算：" class="headerlink" title="巧妙的与运算："></a>巧妙的与运算：</h3><ol>
+<li>首先将线性地址逻辑右移20位，此时还余下12位</li>
+<li>将这12位和操作数0xFFC做一个与运算，0xFFC换算成2进制就是1111 1111 1100。因此做完与运算后，刚刚经过第一步操作还剩下12位的数的低2位，置0了。熟悉移位运算的朋友们知道，这个12位的数，相当于1个10位的数逻辑左移2位得到，换句话说就是将这个10位的数乘4。而这个10位，就是PDI，因此这步操作完了以后，相当于我们获得了PDI*4的值。</li>
+<li>接下来，与0x3FD00000做减法运算，作用相当于加上0xC0300000，两种方法的结果是一样的。因此，我们得到了0xC0300000 + PDI*4的值，而这个值，恰恰就是我们要找的PDE，接着只需要取出里面的值，就可以获取PDE的属性了</li>
+</ol>
+<h3 id="后续跳转"><a href="#后续跳转" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>再获取PDE的属性后，会遇到两个跳转，简单的概括下：</p>
+<ol>
+<li>首先会判断PDE下标为0的位置的值，也就是P位，当P位为0时，说明物理页无效，会跳转到一个相应的处理函数，这里就不再跟进分析</li>
+<li>若物理页P位为1，就会来到第二个跳转，这里test al, al指令会修改标志寄存器，当al的最高位，也就是下标为7的位置值为1时，会被认为是负数，此时会修改EFLAG寄存器的SF位。这时，在第二个跳转的位置，js判断的就是SF的值是否为1，若为1，也就是al下标为7的位置值为1，这是对应的PDE属性PS位，说明这是一个4MB的大页，进而会跳转执行相应的处理函数。</li>
+</ol>
+<h2 id="获取PTE属性"><a href="#获取PTE属性" class="headerlink" title="获取PTE属性"></a>获取PTE属性</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4688 c1e90a          shr     ecx,0Ah		//逻辑右移10位</span><br><span class="line">804e468b 81e1fcff3f00    and     ecx,3FFFFCh		//和操作数进行与运算，同时清空最后2位，相当于PDI左移12位+PTI左移2位</span><br><span class="line">804e4691 81e900000040    sub     ecx,40000000h		//进行减法运算，相当于eax+0xC0000000</span><br><span class="line">804e4697 8bc1            mov     eax,ecx</span><br><span class="line">804e4699 8b08            mov     ecx,dword ptr [eax]	//获取PTE属性</span><br><span class="line">804e469b f6c101          test    cl,1			//判断P位的值是否为0</span><br><span class="line">804e469e 0f84b2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e46a4 84c9            test    cl,cl			//判断PAT是值是否为1</span><br><span class="line">804e46a6 0f88b6de0300    js      nt!MmIsAddressValid+0x3f (80522562)</span><br><span class="line">804e46ac b001            mov     al,1</span><br><span class="line">804e46ae 5d              pop     ebp</span><br><span class="line">804e46af c20400          ret     4</span><br></pre></td></tr></table></figure>
+
+<h3 id="巧妙的与运算"><a href="#巧妙的与运算" class="headerlink" title="巧妙的与运算"></a>巧妙的与运算</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">and ecx, 3FFFFCh</span><br></pre></td></tr></table></figure>
+
+<p>假设线性地址右移10位后的值为 0000 0000 00aa aaaa aaaa bbbb bbbb bbxx（a, b的值为0或者1，这里只是为了区分PDI和PTI）</p>
+<p>然后我们来拆分0x3FFFFC的值：0000 0000 0011 1111 1111 1111 1111 1100</p>
+<p>将两者进行与运算后得到结果为 0000 0000 00aa aaaa aaaa bbbb bbbb bb00</p>
+<p>我们知道，aa aaaa aaaa应为PDI，而bb bbbb bbbb应为PTI，因此可以把得到的结果看作是这样的一个运算：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">aa aaaa aaaa&lt;&lt;12 + bb bbbb bbbb&lt;&lt;2</span><br><span class="line">= aa aaaa aaaa * 2^12 + bb bbbb bbbb * 2^2</span><br><span class="line">= aa aaaa aaaa * 1000h + bb bbbb bbbb * 4h</span><br><span class="line">= PDI*1000h + PTI*4h</span><br></pre></td></tr></table></figure>
+
+<p>因此经过这个与运算后，再通过溢出进行减法运算，获取到PTE的所在位置，便可以取出属性</p>
+<h3 id="后续跳转-1"><a href="#后续跳转-1" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>经过最为关键的步骤，取到了PTE的属性后，还剩下两个跳转，这两个跳转的原理和上述的两个跳转完全一样，分别是取PTE下标为0的P位和下标为7的PAT位，区别仅仅在于，PDE和PTE的下标为7的位的含义不同，所以会跳转进入两个不同的处理函数，这里就不多做分析。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>今天的分析主要是弄清楚Windows系统函数是如何获取物理页属性的，同样是通过利用页目录表基址和页表基址，实现用线性地址访问PDE和PTE，在分析时看到，比较关键的一步是两个与运算，非常巧妙，之后再通过减法运算利用溢出达到和加法运算同样的效果，获取到PDE&#x2F;PTE的值。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>任务段</title>
+    <url>/2022/03/16/%E4%BB%BB%E5%8A%A1%E7%8A%B6%E6%80%81%E6%AE%B5%EF%BC%88TSS%EF%BC%89/</url>
     <content><![CDATA[<blockquote>
 <p>在调用门、中断门与陷阱门中，一旦发生权限切换，那么就必有堆栈的切换。而且，由于CS的CPL发生改变，也导致了SS也必须要切换。</p>
 <p>那么问题来了，我们知道EIP和CS的值都可以通过门描述符获得，那么ESP和SS是哪来的？</p>
@@ -286,74 +397,8 @@
       </tags>
   </entry>
   <entry>
-    <title>基址小实验（10-10-12）</title>
-    <url>/2022/07/23/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/</url>
-    <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过C0300000和C0000000这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
-<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
-<h2 id="测试原始代码"><a href="#测试原始代码" class="headerlink" title="测试原始代码"></a>测试原始代码</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-06-946691fd700d1b1c1e8d4d29276e8289-before-414890.png"></p>
-<p>首先测试原始代码，发现直接修改常量区的字符串，是会失败的</p>
-<h2 id="提权进入0环"><a href="#提权进入0环" class="headerlink" title="提权进入0环"></a>提权进入0环</h2><p>提权这里还是会用到Windbg，根据调用函数的地址，填入段选择子，并通过调用门进行提权（就当复习调用门知识了）</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-13-54-05021cd34209ff0f52323592744b5199-addr-5603f1.png"> </p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-35-144d87388db62a38ec244f39dcc05dbc-windbg-c764d6.png"></p>
-<h2 id="修改R-x2F-W位"><a href="#修改R-x2F-W位" class="headerlink" title="修改R&#x2F;W位"></a>修改R&#x2F;W位</h2><p>提权进入0环后（为啥要提权呢？因为C0300000&#x2F;C0000000都属于高2G的线性地址，3环没法直接访问），就到了我们最关键的步骤了，修改R&#x2F;W位。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">temp = *(int*)0xC0300004;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC0300004 = temp;</span><br><span class="line">temp = *(int*)0xC000108C;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC000108C = temp;</span><br></pre></td></tr></table></figure>
-
-<p>在这之前声明了一个中间变量temp（int类型）。</p>
-<p>具体步骤：</p>
-<ol>
-<li>打印出字符串所在常量区的地址0x423fb0，进行拆分：10-10-12 -&gt; 0x1-0x23-0xfb0</li>
-<li>PDI &#x3D; 0x1，带入公式：PDE &#x3D; C0300000 + 0x1 x 4</li>
-<li>PTI &#x3D; 0x23，带入公式：PTE &#x3D; C0000000 + 0x1 x 1000 + 0x23 x 4</li>
-<li>分别取PDE和PTE处的值，并<strong>和0x2进行或运算（将R&#x2F;W位置1）</strong></li>
-</ol>
-<p>这样就完成了对R&#x2F;W位的修改，在接下来再次对常量区的值进行修改操作时，便可以成功。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-46-50-05a67d4539354f9f4778a64126020e49-after-7736fd.png"></p>
-<h2 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int temp;</span><br><span class="line"></span><br><span class="line">__declspec(naked) void ModifyRW() &#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		pushad</span><br><span class="line">		pushfd</span><br><span class="line">	&#125;</span><br><span class="line">	temp = *(int*)0xC0300004;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC0300004 = temp;</span><br><span class="line">	temp = *(int*)0xC000108C;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC000108C = temp;</span><br><span class="line">	</span><br><span class="line">	__asm &#123;</span><br><span class="line">		popfd</span><br><span class="line">		popad</span><br><span class="line">		retf</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;; </span><br><span class="line">	char buffer[6] = &#123;0, 0, 0, 0, 0x4B, 0&#125;;</span><br><span class="line">	printf(&quot;addr: %x, str: %s&quot;, str, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line">	printf(&quot;str: %s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>任务门</title>
-    <url>/2022/07/20/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
-    <content><![CDATA[<h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
-<p>简要概括，任务门有如下优势：</p>
-<ul>
-<li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
-<li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
-<li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
-</ul>
-<p>下面为不同表中，任务门进行任务切换的过程：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
-<h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
-<p>任务门描述符的结构非常简单，真正用到的只有24位，属性位里：DPL一般设置为3，方便应用程序访问，Type则是固定的0101，TSS段选择子，顾名思义，就是一个段选择子，指向位于GDT表中TSS段描述符的位置。其余位均为保留位，置0即可。</p>
-<h2 id="任务门实现任务切换"><a href="#任务门实现任务切换" class="headerlink" title="任务门实现任务切换"></a>任务门实现任务切换</h2><p>这一步十分简单，仅仅比使用TSS多了一个步骤而已，这里也不细讲了，直接上步骤。</p>
-<p>首先，编译源文件，下断点，确定TSS的地址，根据地址构造TSS段描述符：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structDesc.png"></p>
-<p>第二步，根据GDT表中构造好的TSS段描述符位置，在IDT表中构造任务门：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structSelect.png"></p>
-<p>第三步，在Windbg中使用!process 0 0指令确定CR3的值，并填入自己的TSS中：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
-<p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>页目录&amp;页表基址</title>
-    <url>/2022/07/21/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&amp;%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/</url>
+    <url>/2022/03/20/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&amp;%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/</url>
     <content><![CDATA[<blockquote>
 <p>考虑这样一个问题，我们现在可以通过在Windbg里找到线性地址所在的物理页，通过修改物理页的属性，就可以实现一些原本受限的功能。例如将常量区对应的物理页R&#x2F;W属性修改为1，便可以修改位于常量区的元素。</p>
 <p>但是，以上操作都是基于Windbg在双击调试的环境中实现的，那么一旦脱离了调试器，该如何通过代码来实现对物理页属性的修改呢？这就需要借助于页目录表基址和页表基址了。</p>
@@ -452,51 +497,6 @@
 </ul>
 <h3 id="谁填充了这些表呢"><a href="#谁填充了这些表呢" class="headerlink" title="谁填充了这些表呢"></a>谁填充了这些表呢</h3><p><strong>进程本身可以通过0xC0300000和0xC0000000访问修改任意物理页</strong>，那么是谁为我们填充0xC0300000和0xC0000000的PDE与PTE呢？</p>
 <p>进程的创建过程：当创建B进程时，先在A进程中将B进程所有信息全部构建好，然后切换Cr3即可。也就是说，最开始的这张表是由A进程填充的。</p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>逆向分析MmIsAddressValid（10-10-12）</title>
-    <url>/2022/07/23/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid(10-10-12)/</url>
-    <content><![CDATA[<p>在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">kd&gt; u MmIsAddressValid</span><br></pre></td></tr></table></figure>
-
-<p>查看。</p>
-<p>为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的MmIsAddressValid函数，就利用了这么一个原理，相比前一篇的基址小实验，这里对于线性地址拆分的过程更为巧妙，让我们一起来看看吧！</p>
-<h2 id="获取PDE属性"><a href="#获取PDE属性" class="headerlink" title="获取PDE属性"></a>获取PDE属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-04-35-dad27cbe16aabf5c4d005018b697acc7-original-ac218c.png"></p>
-<p>首先观察函数主体部分，发现代码并不长，但是有很多跳转，具体跳转内容就不作分析了，主要是分析函数主体：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4661 8bff            mov     edi,edi		//hotpatch</span><br><span class="line">804e4663 55              push    ebp</span><br><span class="line">804e4664 8bec            mov     ebp,esp</span><br><span class="line">804e4666 8b4d08          mov     ecx,dword ptr [ebp+8]	//取第一个参数（线性地址）</span><br><span class="line">804e4669 8bc1            mov     eax,ecx		//赋值到中间变量，方便运算</span><br><span class="line">804e466b c1e814          shr     eax,14h		//逻辑右移20位</span><br><span class="line">804e466e bafc0f0000      mov     edx,0FFCh				</span><br><span class="line">804e4673 23c2            and     eax,edx		//和操作数进行与运算，同时清空最后2位；相当于做了一个乘4的运算，既左移2位</span><br><span class="line">804e4675 2d0000d03f      sub     eax,3FD00000h		//进行减法运算，相当于eax+0xC0300000</span><br><span class="line">804e467a 8b00            mov     eax,dword ptr [eax]	//取PDE的值</span><br><span class="line">804e467c a801            test    al,1			//判断PDE属性P位是否为1</span><br><span class="line">804e467e 0f84d2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e4684 84c0            test    al,al			//判断下标为7的位(PS位)值是否为1</span><br><span class="line">804e4686 7824            js      nt!MmIsAddressValid+0x53 (804e46ac)</span><br></pre></td></tr></table></figure>
-
-<h3 id="巧妙的与运算："><a href="#巧妙的与运算：" class="headerlink" title="巧妙的与运算："></a>巧妙的与运算：</h3><ol>
-<li>首先将线性地址逻辑右移20位，此时还余下12位</li>
-<li>将这12位和操作数0xFFC做一个与运算，0xFFC换算成2进制就是1111 1111 1100。因此做完与运算后，刚刚经过第一步操作还剩下12位的数的低2位，置0了。熟悉移位运算的朋友们知道，这个12位的数，相当于1个10位的数逻辑左移2位得到，换句话说就是将这个10位的数乘4。而这个10位，就是PDI，因此这步操作完了以后，相当于我们获得了PDI*4的值。</li>
-<li>接下来，与0x3FD00000做减法运算，作用相当于加上0xC0300000，两种方法的结果是一样的。因此，我们得到了0xC0300000 + PDI*4的值，而这个值，恰恰就是我们要找的PDE，接着只需要取出里面的值，就可以获取PDE的属性了</li>
-</ol>
-<h3 id="后续跳转"><a href="#后续跳转" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>再获取PDE的属性后，会遇到两个跳转，简单的概括下：</p>
-<ol>
-<li>首先会判断PDE下标为0的位置的值，也就是P位，当P位为0时，说明物理页无效，会跳转到一个相应的处理函数，这里就不再跟进分析</li>
-<li>若物理页P位为1，就会来到第二个跳转，这里test al, al指令会修改标志寄存器，当al的最高位，也就是下标为7的位置值为1时，会被认为是负数，此时会修改EFLAG寄存器的SF位。这时，在第二个跳转的位置，js判断的就是SF的值是否为1，若为1，也就是al下标为7的位置值为1，这是对应的PDE属性PS位，说明这是一个4MB的大页，进而会跳转执行相应的处理函数。</li>
-</ol>
-<h2 id="获取PTE属性"><a href="#获取PTE属性" class="headerlink" title="获取PTE属性"></a>获取PTE属性</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4688 c1e90a          shr     ecx,0Ah		//逻辑右移10位</span><br><span class="line">804e468b 81e1fcff3f00    and     ecx,3FFFFCh		//和操作数进行与运算，同时清空最后2位，相当于PDI左移12位+PTI左移2位</span><br><span class="line">804e4691 81e900000040    sub     ecx,40000000h		//进行减法运算，相当于eax+0xC0000000</span><br><span class="line">804e4697 8bc1            mov     eax,ecx</span><br><span class="line">804e4699 8b08            mov     ecx,dword ptr [eax]	//获取PTE属性</span><br><span class="line">804e469b f6c101          test    cl,1			//判断P位的值是否为0</span><br><span class="line">804e469e 0f84b2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e46a4 84c9            test    cl,cl			//判断PAT是值是否为1</span><br><span class="line">804e46a6 0f88b6de0300    js      nt!MmIsAddressValid+0x3f (80522562)</span><br><span class="line">804e46ac b001            mov     al,1</span><br><span class="line">804e46ae 5d              pop     ebp</span><br><span class="line">804e46af c20400          ret     4</span><br></pre></td></tr></table></figure>
-
-<h3 id="巧妙的与运算"><a href="#巧妙的与运算" class="headerlink" title="巧妙的与运算"></a>巧妙的与运算</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">and ecx, 3FFFFCh</span><br></pre></td></tr></table></figure>
-
-<p>假设线性地址右移10位后的值为 0000 0000 00aa aaaa aaaa bbbb bbbb bbxx（a, b的值为0或者1，这里只是为了区分PDI和PTI）</p>
-<p>然后我们来拆分0x3FFFFC的值：0000 0000 0011 1111 1111 1111 1111 1100</p>
-<p>将两者进行与运算后得到结果为 0000 0000 00aa aaaa aaaa bbbb bbbb bb00</p>
-<p>我们知道，aa aaaa aaaa应为PDI，而bb bbbb bbbb应为PTI，因此可以把得到的结果看作是这样的一个运算：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">aa aaaa aaaa&lt;&lt;12 + bb bbbb bbbb&lt;&lt;2</span><br><span class="line">= aa aaaa aaaa * 2^12 + bb bbbb bbbb * 2^2</span><br><span class="line">= aa aaaa aaaa * 1000h + bb bbbb bbbb * 4h</span><br><span class="line">= PDI*1000h + PTI*4h</span><br></pre></td></tr></table></figure>
-
-<p>因此经过这个与运算后，再通过溢出进行减法运算，获取到PTE的所在位置，便可以取出属性</p>
-<h3 id="后续跳转-1"><a href="#后续跳转-1" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>经过最为关键的步骤，取到了PTE的属性后，还剩下两个跳转，这两个跳转的原理和上述的两个跳转完全一样，分别是取PTE下标为0的P位和下标为7的PAT位，区别仅仅在于，PDE和PTE的下标为7的位的含义不同，所以会跳转进入两个不同的处理函数，这里就不多做分析。</p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>今天的分析主要是弄清楚Windows系统函数是如何获取物理页属性的，同样是通过利用页目录表基址和页表基址，实现用线性地址访问PDE和PTE，在分析时看到，比较关键的一步是两个与运算，非常巧妙，之后再通过减法运算利用溢出达到和加法运算同样的效果，获取到PDE&#x2F;PTE的值。</p>
 ]]></content>
       <categories>
         <category>Windows内核</category>
