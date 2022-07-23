@@ -1,0 +1,233 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><title>逆向分析MmIsAddressValid（10-10-12） | wawayu Notes</title><meta name="keywords" content="保护模式,x86,Windows内核"><meta name="author" content="wawayu"><meta name="copyright" content="wawayu"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令 1kd&gt; u MmIsAddressValid  查看。 为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的Mm">
+<meta property="og:type" content="article">
+<meta property="og:title" content="逆向分析MmIsAddressValid（10-10-12）">
+<meta property="og:url" content="https://happy1wawayu.github.io/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid/index.html">
+<meta property="og:site_name" content="wawayu Notes">
+<meta property="og:description" content="在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令 1kd&gt; u MmIsAddressValid  查看。 为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的Mm">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png">
+<meta property="article:published_time" content="2022-03-20T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-07-23T06:30:19.714Z">
+<meta property="article:author" content="wawayu">
+<meta property="article:tag" content="保护模式">
+<meta property="article:tag" content="x86">
+<meta property="article:tag" content="Windows内核">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://happy1wawayu.github.io/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid/"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":true,"languages":{"hits_empty":"找不到您查询的内容：${query}"}},
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  date_suffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: undefined,
+  source: {
+    justifiedGallery: {
+      js: 'https://cdn.jsdelivr.net/npm/flickr-justified-gallery/dist/fjGallery.min.js',
+      css: 'https://cdn.jsdelivr.net/npm/flickr-justified-gallery/dist/fjGallery.min.css'
+    }
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '逆向分析MmIsAddressValid（10-10-12）',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2022-07-23 14:30:19'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  .justified-gallery img {
+    opacity: 1
+  }
+
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+    win.saveToLocal = {
+      set: function setWithExpiry(key, value, ttl) {
+        if (ttl === 0) return
+        const now = new Date()
+        const expiryDay = ttl * 86400000
+        const item = {
+          value: value,
+          expiry: now.getTime() + expiryDay,
+        }
+        localStorage.setItem(key, JSON.stringify(item))
+      },
+
+      get: function getWithExpiry(key) {
+        const itemStr = localStorage.getItem(key)
+
+        if (!itemStr) {
+          return undefined
+        }
+        const item = JSON.parse(itemStr)
+        const now = new Date()
+
+        if (now.getTime() > item.expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return item.value
+      }
+    }
+  
+    win.getScript = url => new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = url
+      script.async = true
+      script.onerror = reject
+      script.onload = script.onreadystatechange = function() {
+        const loadState = this.readyState
+        if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+        script.onload = script.onreadystatechange = null
+        resolve()
+      }
+      document.head.appendChild(script)
+    })
+  
+      win.activateDarkMode = function () {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = function () {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          if (t === 'dark') activateDarkMode()
+          else if (t === 'light') activateLightMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+    const detectApple = () => {
+      if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+    })(window)</script><meta name="generator" content="Hexo 6.2.0"></head><body><div id="loading-box"><div class="loading-left-bg"></div><div class="loading-right-bg"></div><div class="spinner-box"><div class="configure-border-1"><div class="configure-core"></div></div><div class="configure-border-2"><div class="configure-core"></div></div><div class="loading-word">加载中...</div></div></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">8</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><hr/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> Link</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> About</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png')"><nav id="nav"><span id="blog_name"><a id="site-name" href="/">wawayu Notes</a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> Link</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> About</span></a></div></div><div id="toggle-menu"><a class="site-page"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">逆向分析MmIsAddressValid（10-10-12）</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2022-03-20T16:00:00.000Z" title="发表于 2022-03-21 00:00:00">2022-03-21</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2022-07-23T06:30:19.714Z" title="更新于 2022-07-23 14:30:19">2022-07-23</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/Windows%E5%86%85%E6%A0%B8/">Windows内核</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="逆向分析MmIsAddressValid（10-10-12）"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><p>在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kd&gt; u MmIsAddressValid</span><br></pre></td></tr></table></figure>
+
+<p>查看。</p>
+<p>为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的MmIsAddressValid函数，就利用了这么一个原理，相比前一篇的基址小实验，这里对于线性地址拆分的过程更为巧妙，让我们一起来看看吧！</p>
+<h2 id="获取PDE属性"><a href="#获取PDE属性" class="headerlink" title="获取PDE属性"></a>获取PDE属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-04-35-dad27cbe16aabf5c4d005018b697acc7-original-ac218c.png"></p>
+<p>首先观察函数主体部分，发现代码并不长，但是有很多跳转，具体跳转内容就不作分析了，主要是分析函数主体：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">804e4661 8bff            mov     edi,edi		//hotpatch</span><br><span class="line">804e4663 55              push    ebp</span><br><span class="line">804e4664 8bec            mov     ebp,esp</span><br><span class="line">804e4666 8b4d08          mov     ecx,dword ptr [ebp+8]	//取第一个参数（线性地址）</span><br><span class="line">804e4669 8bc1            mov     eax,ecx		//赋值到中间变量，方便运算</span><br><span class="line">804e466b c1e814          shr     eax,14h		//逻辑右移20位</span><br><span class="line">804e466e bafc0f0000      mov     edx,0FFCh				</span><br><span class="line">804e4673 23c2            and     eax,edx		//和操作数进行与运算，同时清空最后2位；相当于做了一个乘4的运算，既左移2位</span><br><span class="line">804e4675 2d0000d03f      sub     eax,3FD00000h		//进行减法运算，相当于eax+0xC0300000</span><br><span class="line">804e467a 8b00            mov     eax,dword ptr [eax]	//取PDE的值</span><br><span class="line">804e467c a801            test    al,1			//判断PDE属性P位是否为1</span><br><span class="line">804e467e 0f84d2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e4684 84c0            test    al,al			//判断下标为7的位(PS位)值是否为1</span><br><span class="line">804e4686 7824            js      nt!MmIsAddressValid+0x53 (804e46ac)</span><br></pre></td></tr></table></figure>
+
+<h3 id="巧妙的与运算："><a href="#巧妙的与运算：" class="headerlink" title="巧妙的与运算："></a>巧妙的与运算：</h3><ol>
+<li>首先将线性地址逻辑右移20位，此时还余下12位</li>
+<li>将这12位和操作数0xFFC做一个与运算，0xFFC换算成2进制就是1111 1111 1100。因此做完与运算后，刚刚经过第一步操作还剩下12位的数的低2位，置0了。熟悉移位运算的朋友们知道，这个12位的数，相当于1个10位的数逻辑左移2位得到，换句话说就是将这个10位的数乘4。而这个10位，就是PDI，因此这步操作完了以后，相当于我们获得了PDI*4的值。</li>
+<li>接下来，与0x3FD00000做减法运算，作用相当于加上0xC0300000，两种方法的结果是一样的。因此，我们得到了0xC0300000 + PDI*4的值，而这个值，恰恰就是我们要找的PDE，接着只需要取出里面的值，就可以获取PDE的属性了</li>
+</ol>
+<h3 id="后续跳转"><a href="#后续跳转" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>再获取PDE的属性后，会遇到两个跳转，简单的概括下：</p>
+<ol>
+<li>首先会判断PDE下标为0的位置的值，也就是P位，当P位为0时，说明物理页无效，会跳转到一个相应的处理函数，这里就不再跟进分析</li>
+<li>若物理页P位为1，就会来到第二个跳转，这里test al, al指令会修改标志寄存器，当al的最高位，也就是下标为7的位置值为1时，会被认为是负数，此时会修改EFLAG寄存器的SF位。这时，在第二个跳转的位置，js判断的就是SF的值是否为1，若为1，也就是al下标为7的位置值为1，这是对应的PDE属性PS位，说明这是一个4MB的大页，进而会跳转执行相应的处理函数。</li>
+</ol>
+<h2 id="获取PTE属性"><a href="#获取PTE属性" class="headerlink" title="获取PTE属性"></a>获取PTE属性</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">804e4688 c1e90a          shr     ecx,0Ah		//逻辑右移10位</span><br><span class="line">804e468b 81e1fcff3f00    and     ecx,3FFFFCh		//和操作数进行与运算，同时清空最后2位，相当于PDI左移12位+PTI左移2位</span><br><span class="line">804e4691 81e900000040    sub     ecx,40000000h		//进行减法运算，相当于eax+0xC0000000</span><br><span class="line">804e4697 8bc1            mov     eax,ecx</span><br><span class="line">804e4699 8b08            mov     ecx,dword ptr [eax]	//获取PTE属性</span><br><span class="line">804e469b f6c101          test    cl,1			//判断P位的值是否为0</span><br><span class="line">804e469e 0f84b2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e46a4 84c9            test    cl,cl			//判断PAT是值是否为1</span><br><span class="line">804e46a6 0f88b6de0300    js      nt!MmIsAddressValid+0x3f (80522562)</span><br><span class="line">804e46ac b001            mov     al,1</span><br><span class="line">804e46ae 5d              pop     ebp</span><br><span class="line">804e46af c20400          ret     4</span><br></pre></td></tr></table></figure>
+
+<h3 id="巧妙的与运算"><a href="#巧妙的与运算" class="headerlink" title="巧妙的与运算"></a>巧妙的与运算</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">and ecx, 3FFFFCh</span><br></pre></td></tr></table></figure>
+
+<p>假设线性地址右移10位后的值为 0000 0000 00aa aaaa aaaa bbbb bbbb bbxx（a, b的值为0或者1，这里只是为了区分PDI和PTI）</p>
+<p>然后我们来拆分0x3FFFFC的值：0000 0000 0011 1111 1111 1111 1111 1100</p>
+<p>将两者进行与运算后得到结果为 0000 0000 00aa aaaa aaaa bbbb bbbb bb00</p>
+<p>我们知道，aa aaaa aaaa应为PDI，而bb bbbb bbbb应为PTI，因此可以把得到的结果看作是这样的一个运算：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">aa aaaa aaaa&lt;&lt;12 + bb bbbb bbbb&lt;&lt;2</span><br><span class="line">= aa aaaa aaaa * 2^12 + bb bbbb bbbb * 2^2</span><br><span class="line">= aa aaaa aaaa * 1000h + bb bbbb bbbb * 4h</span><br><span class="line">= PDI*1000h + PTI*4h</span><br></pre></td></tr></table></figure>
+
+<p>因此经过这个与运算后，再通过溢出进行减法运算，获取到PTE的所在位置，便可以取出属性</p>
+<h3 id="后续跳转-1"><a href="#后续跳转-1" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>经过最为关键的步骤，取到了PTE的属性后，还剩下两个跳转，这两个跳转的原理和上述的两个跳转完全一样，分别是取PTE下标为0的P位和下标为7的PAT位，区别仅仅在于，PDE和PTE的下标为7的位的含义不同，所以会跳转进入两个不同的处理函数，这里就不多做分析。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>今天的分析主要是弄清楚Windows系统函数是如何获取物理页属性的，同样是通过利用页目录表基址和页表基址，实现用线性地址访问PDE和PTE，在分析时看到，比较关键的一步是两个与运算，非常巧妙，之后再通过减法运算利用溢出达到和加法运算同样的效果，获取到PDE&#x2F;PTE的值。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://happy1wawayu.github.io">wawayu</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://happy1wawayu.github.io/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid/">https://happy1wawayu.github.io/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://happy1wawayu.github.io" target="_blank">wawayu Notes</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/">保护模式</a><a class="post-meta__tags" href="/tags/x86/">x86</a><a class="post-meta__tags" href="/tags/Windows%E5%86%85%E6%A0%B8/">Windows内核</a></div><div class="post_share"><div class="social-share" data-image="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/2022/03/22/2-9-9-12%E5%88%86%E9%A1%B5/"><img class="prev-cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="onerror=null;src='/img/404.jpg'" alt="cover of previous post"><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">2-9-9-12分页</div></div></a></div><div class="next-post pull-right"><a href="/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/"><img class="next-cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">基址小实验（10-10-12）</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/2022/03/18/10-10-12%E5%88%86%E9%A1%B5/" title="10-10-12分页"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-18</div><div class="title">10-10-12分页</div></div></a></div><div><a href="/2022/03/22/2-9-9-12%E5%88%86%E9%A1%B5/" title="2-9-9-12分页"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-22</div><div class="title">2-9-9-12分页</div></div></a></div><div><a href="/2022/03/17/%E4%BB%BB%E5%8A%A1%E9%97%A8/" title="任务门"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-17</div><div class="title">任务门</div></div></a></div><div><a href="/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/" title="基址小实验（10-10-12）"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-20</div><div class="title">基址小实验（10-10-12）</div></div></a></div><div><a href="/2022/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/" title="任务段"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-16</div><div class="title">任务段</div></div></a></div><div><a href="/2022/03/20/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/" title="页目录&amp;页表基址"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-20</div><div class="title">页目录&amp;页表基址</div></div></a></div></div></div><hr/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="gitalk-container"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/img/avatar.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">wawayu</div><div class="author-info__description"></div></div><div class="card-info-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">8</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/happy1wawayu"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/happy1wawayu" target="_blank" title="Github"><i class="fab fa-github"></i></a><a class="social-icon" href="mailto:wawayu94@gmail.com" target="_blank" title="Email"><i class="fas fa-envelope"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">Welcome!</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%8E%B7%E5%8F%96PDE%E5%B1%9E%E6%80%A7"><span class="toc-number">1.</span> <span class="toc-text">获取PDE属性</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B7%A7%E5%A6%99%E7%9A%84%E4%B8%8E%E8%BF%90%E7%AE%97%EF%BC%9A"><span class="toc-number">1.1.</span> <span class="toc-text">巧妙的与运算：</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%90%8E%E7%BB%AD%E8%B7%B3%E8%BD%AC"><span class="toc-number">1.2.</span> <span class="toc-text">后续跳转</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%8E%B7%E5%8F%96PTE%E5%B1%9E%E6%80%A7"><span class="toc-number">2.</span> <span class="toc-text">获取PTE属性</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B7%A7%E5%A6%99%E7%9A%84%E4%B8%8E%E8%BF%90%E7%AE%97"><span class="toc-number">2.1.</span> <span class="toc-text">巧妙的与运算</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%90%8E%E7%BB%AD%E8%B7%B3%E8%BD%AC-1"><span class="toc-number">2.2.</span> <span class="toc-text">后续跳转</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">3.</span> <span class="toc-text">总结</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/2022/07/23/PDE_PTE%E5%B1%9E%E6%80%A7%EF%BC%88%E9%83%A8%E5%88%86%EF%BC%89/" title="无题"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="无题"/></a><div class="content"><a class="title" href="/2022/07/23/PDE_PTE%E5%B1%9E%E6%80%A7%EF%BC%88%E9%83%A8%E5%88%86%EF%BC%89/" title="无题">无题</a><time datetime="2022-07-23T06:39:38.021Z" title="发表于 2022-07-23 14:39:38">2022-07-23</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2022/03/22/2-9-9-12%E5%88%86%E9%A1%B5/" title="2-9-9-12分页"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="2-9-9-12分页"/></a><div class="content"><a class="title" href="/2022/03/22/2-9-9-12%E5%88%86%E9%A1%B5/" title="2-9-9-12分页">2-9-9-12分页</a><time datetime="2022-03-21T16:00:00.000Z" title="发表于 2022-03-22 00:00:00">2022-03-22</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid/" title="逆向分析MmIsAddressValid（10-10-12）"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="逆向分析MmIsAddressValid（10-10-12）"/></a><div class="content"><a class="title" href="/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid/" title="逆向分析MmIsAddressValid（10-10-12）">逆向分析MmIsAddressValid（10-10-12）</a><time datetime="2022-03-20T16:00:00.000Z" title="发表于 2022-03-21 00:00:00">2022-03-21</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/" title="基址小实验（10-10-12）"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="基址小实验（10-10-12）"/></a><div class="content"><a class="title" href="/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/" title="基址小实验（10-10-12）">基址小实验（10-10-12）</a><time datetime="2022-03-19T16:00:00.000Z" title="发表于 2022-03-20 00:00:00">2022-03-20</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2022/03/20/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&amp;%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/" title="页目录&amp;页表基址"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="页目录&amp;页表基址"/></a><div class="content"><a class="title" href="/2022/03/20/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&amp;%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/" title="页目录&amp;页表基址">页目录&amp;页表基址</a><time datetime="2022-03-19T16:00:00.000Z" title="发表于 2022-03-20 00:00:00">2022-03-20</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2020 - 2022 By wawayu</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside_config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><i class="fas fa-arrow-up"></i></button></div></div><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><span id="loading-status"></span><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="is-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据库加载中</span></div><div class="search-wrap"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div><hr/><div id="local-search-results"></div></div></div><div id="search-mask"></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.umd.min.js"></script><script src="/js/search/local-search.js"></script><script>var preloader = {
+  endLoading: () => {
+    document.body.style.overflow = 'auto';
+    document.getElementById('loading-box').classList.add("loaded")
+  },
+  initLoading: () => {
+    document.body.style.overflow = '';
+    document.getElementById('loading-box').classList.remove("loaded")
+
+  }
+}
+window.addEventListener('load',preloader.endLoading())</script><div class="js-pjax"><script>function addGitalkSource () {
+  const ele = document.createElement('link')
+  ele.rel = 'stylesheet'
+  ele.href= 'https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.css'
+  document.getElementsByTagName('head')[0].appendChild(ele)
+}
+
+function loadGitalk () {
+  function initGitalk () {
+    var gitalk = new Gitalk(Object.assign({
+      clientID: '078086393b3fd0aec773',
+      clientSecret: '4dbd3012837c510a449de8da8ae0716a5877f0af',
+      repo: 'happy1wawayu.github.io',
+      owner: 'happy1wawayu',
+      admin: ['happy1wawayu'],
+      id: 'a20f9af5620c54cde3ececacca15a37f',
+      updateCountCallback: commentCount
+    },null))
+
+    gitalk.render('gitalk-container')
+  }
+
+  if (typeof Gitalk === 'function') initGitalk()
+  else {
+    addGitalkSource()
+    getScript('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.js').then(initGitalk)
+  }
+}
+
+function commentCount(n){
+  let isCommentCount = document.querySelector('#post-meta .gitalk-comment-count')
+  if (isCommentCount) {
+    isCommentCount.innerHTML= n
+  }
+}
+
+if ('Gitalk' === 'Gitalk' || !false) {
+  if (false) btf.loadComment(document.getElementById('gitalk-container'), loadGitalk)
+  else loadGitalk()
+} else {
+  function loadOtherComment () {
+    loadGitalk()
+  }
+}</script></div><script defer="defer" id="ribbon" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-ribbon.min.js" size="150" alpha="0.6" zIndex="-1" mobile="false" data-click="false"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="false"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
