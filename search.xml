@@ -10,7 +10,7 @@
 <h2 id="段与页"><a href="#段与页" class="headerlink" title="段与页"></a>段与页</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/segAndPage.png"></p>
 <p>这是Intel白皮书中介绍关于段与页的概要图，经过段的学习，可以很容易的理解左半部分，这是一个根据所提供的<strong>有效地址（图中Offset）</strong>以及段寄存器中确定的基址，锁定线性地址空间中的某个<strong>线性地址（Linear Address）</strong>的过程。而右半部分，则是利用了页的功能，通过拆分<strong>线性地址</strong>，一步步转化成了<strong>物理地址</strong>。</p>
 <p>上述提到了3个概念，有效地址，线性地址以及物理地址，文字叙述会让人混淆，我们来看一条语句：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; 0x12345678是**有效地址**</span><br><span class="line">; ds.Base + 0x12345678是**线性地址**</span><br><span class="line">mov dword ptr ds:[0x12345678], 0x123</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; 0x12345678是有效地址</span><br><span class="line">; ds.Base + 0x12345678是线性地址</span><br><span class="line">mov dword ptr ds:[0x12345678], 0x123</span><br></pre></td></tr></table></figure>
 
 <p>这都非常好理解，那什么是物理地址呢？考虑这样一个问题，掌握3环知识的小伙伴们知道每个进程都有4GB的内存空间，这时如果有一个进程A，给会进行一个操作，给<code>ds.Base + 0x12345678</code>赋值<code>0x123</code>，还有一个进程B，同样会给<code>ds.Base + 0x12345678</code>赋值<code>0x123</code>，那么<code>ds.Base + 0x12345678</code>处的位置到底是哪个值呢？还是两者都不是呢？这就涉及到了物理地址的概念。</p>
 <h2 id="PDT与PTT"><a href="#PDT与PTT" class="headerlink" title="PDT与PTT"></a>PDT与PTT</h2><p>每个进程都有一个CR3的值，CR3是什么？实际之前在TSS切换时也用到了，具体等到了控制寄存器那会详细分析。简单来说，CR3被用来<strong>切换和定位当前正在使用的页表</strong>，它是一个32位的寄存器，其中高20位指向一个<strong>物理页</strong>（Windows系统上，一个页的大小是4KB，也就是4096个字节），如下图所示：</p>
@@ -201,64 +201,6 @@
       </tags>
   </entry>
   <entry>
-    <title>PDE_PTE属性（部分）</title>
-    <url>/2022/03/19/PDE_PTE%E5%B1%9E%E6%80%A7/</url>
-    <content><![CDATA[<p>上一篇文章中了解了PDE和PTE，这一篇就来了解一下PDE和PTE的属性。</p>
-<h2 id="物理页的属性"><a href="#物理页的属性" class="headerlink" title="物理页的属性"></a>物理页的属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-25-46-9b5dc5ae7b30714e111bdf929c88d08d-attr-2149b9.png"></p>
-<p>一上来看这张图，肯定是一脸懵逼的。先从行开始看，第一行是关于CR3寄存器的，这部分留到控制寄存器的章节再分析。接下来三行是不同类型PDE的，最后两行是PTE的。其中PDE和PTE有很多属性是重合的。而物理页的属性，就是有PDE和PTE共同决定的。计算方法是将相同属性位的值进行与运算。</p>
-<p>物理页的属性 &#x3D; PDE属性 &amp; PTE属性</p>
-<h2 id="P位"><a href="#P位" class="headerlink" title="P位"></a>P位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-25-58-913745745e113b72fb181b8d6862b42a-p-8d5c7d.png"></p>
-<p>首先来看P（Present）位：存在位。PDE与PTE的P位均位1时，物理页有效；其余情况，物理页不存在。这也解释了为什么PDE的第三行和PTE的第二行可以直接忽略。</p>
-<p>在上一篇文章中，有一个关于<a href="https://happy1wawayu.github.io/2022/03/18/10-10-12%E5%88%86%E9%A1%B5/#0%E5%9C%B0%E5%9D%80%E4%B9%9F%E8%83%BD%E5%AD%98%E5%80%BC%EF%BC%9F">0地址赋值</a>的实验。0地址之所以不能赋值是因为它的PTE的P位为0，在我们修改了PTE的P位，并给它挂上一个物理页后，0地址遍可以赋值了。</p>
-<h2 id="R-x2F-W位"><a href="#R-x2F-W位" class="headerlink" title="R&#x2F;W位"></a>R&#x2F;W位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-27-21-b034176b9f80e03df97fcfe7af55f9b4-RW-a6c90a.png"></p>
-<ul>
-<li>R&#x2F;W &#x3D; 0 只读</li>
-<li>R&#x2F;W &#x3D; 1 可读可写</li>
-</ul>
-<p>R&#x2F;W很好理解，控制写的权限呗，这个位有何用呢？来看一个小实验。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;;</span><br><span class="line">	printf(&quot;%x&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	printf(&quot;%s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>来看这个代码，很明显，执行会是失败的，因为用char*定义的字符串，是会存储在常量区，而不是堆栈中了，又因为常量区的值是不允许修改的，因此</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">*str = &#x27;a&#x27;;</span><br></pre></td></tr></table></figure>
-
-<p>这条语句会执行失败并报错。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-27-39-b80e5b84ea59244bed1a5c6dcd3da680-RWCodeBefore-d877ed.png"></p>
-<p>那为什么常量区的内容就不可修改呢？其实，说白了，就是常量区挂着的物理页的R&#x2F;W属性为0，因此只能读，不可写，既然知道了原因，我们只要修改了常量区所在物理页的属性，将R&#x2F;W位置1即可。</p>
-<p>通过printf语句先打印出所在常量区的线性地址，接着拆分跟进PDE和PTE中（具体步骤省略）</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-27-53-c1fc242ea9ff6977acee3581c2f6b9c6-RWWin-8f4a00.png"></p>
-<p>可以发现，PTE的R&#x2F;W位值为0，因此将其修改为1写入，随后运行程序发现，可以成功修改字符串首地址出的字符！</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-01-3f1b4b021d9189dbf19e9afe4e708be0-RWCodeAfter-109b89.png"></p>
-<h2 id="P-x2F-S位"><a href="#P-x2F-S位" class="headerlink" title="P&#x2F;S位"></a>P&#x2F;S位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-10-2dcd53816755424bb3a5290770a8206c-PS-1dfe78.png"></p>
-<p>P&#x2F;S（PageSize）位，只对PDE有意义，位于PDE的第7位。</p>
-<ul>
-<li>PS &#x3D; 1 PDE直接指向物理页，无PTE，低22位为页内偏移。线性地址只能拆成两段（10-22）：页的大小为2的22次方，也就是4MB，俗称“大页”，大页比较少，一般出现在高2G中</li>
-<li>PS &#x3D; 0 就是我们比较熟悉的10-10-12分页，页的大小为4KB</li>
-</ul>
-<h2 id="U-x2F-S位"><a href="#U-x2F-S位" class="headerlink" title="U&#x2F;S位"></a>U&#x2F;S位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-19-80e31527d73ebb09af96d5449db8e044-US-e4961e.png"></p>
-<p>U&#x2F;S（User&#x2F;System）位，位于PDE&#x2F;PTE的第2位。</p>
-<ul>
-<li>U&#x2F;S &#x3D; 0：特权用户</li>
-<li>U&#x2F;S &#x3D; 1：普通用户</li>
-</ul>
-<p>三环程序是不能读写高2G内存的，原因在于高2G内存对应的物理页U&#x2F;S位被置0了，也就是说只有特权用户才能读写高2G的内存。所以，当普通用户想要读取高2G内存时，就可以把U&#x2F;S置1，这样就可以访问高2G内存了。</p>
-<p>当然，理论如此，不过除了U&#x2F;S位外，影响高2G内存读写的还有PCD位和PWT位，这部分内容也要到控制寄存器部分才能讲，所以第二种3环程序读写高2G实验（第一种是通过门提权），就要放到后面实现了，这里只要先记住，U&#x2F;S位是影响访问读写权限的。</p>
-<h3 id="与R-x2F-W的区别"><a href="#与R-x2F-W的区别" class="headerlink" title="与R&#x2F;W的区别"></a>与R&#x2F;W的区别</h3><p>这里需要注意一下U&#x2F;S位与R&#x2F;W位的区别，U&#x2F;S位的读写控制是根据用户的级别，而R&#x2F;W位的控制是直接控制读写，不管你是不是特权用户。</p>
-<h2 id="A位"><a href="#A位" class="headerlink" title="A位"></a>A位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-29-37a2dc13f0cce521096c813fa5c743fc-A-bc4256.png"></p>
-<p>A（Accessed）位于PDE&#x2F;PTE的第5位：表示该物理页是否被访问（读或者写）过，访问过置1，即使只访问一个字节也会导致PDE，PTE置1。</p>
-<h2 id="D位"><a href="#D位" class="headerlink" title="D位"></a>D位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-43-ed7f9fa4d2217f1ef70ac21c89e68b85-D-57108f.png"></p>
-<p>D（Dirty），脏位，是否被写过。0表示没有被写过，1表示被写过</p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>以上是关于PDE&#x2F;PTE部分属性的含义，还有一部分位没有涉及到，例如G位，PWT位，PCD位，这些需要讲到控制寄存器和TLB相关概念时再细讲。</p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>任务段</title>
     <url>/2022/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/</url>
     <content><![CDATA[<blockquote>
@@ -344,6 +286,64 @@
       </tags>
   </entry>
   <entry>
+    <title>PDE_PTE属性（部分）</title>
+    <url>/2022/03/19/PDE_PTE%E5%B1%9E%E6%80%A7/</url>
+    <content><![CDATA[<p>上一篇文章中了解了PDE和PTE，这一篇就来了解一下PDE和PTE的属性。</p>
+<h2 id="物理页的属性"><a href="#物理页的属性" class="headerlink" title="物理页的属性"></a>物理页的属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-25-46-9b5dc5ae7b30714e111bdf929c88d08d-attr-2149b9.png"></p>
+<p>一上来看这张图，肯定是一脸懵逼的。先从行开始看，第一行是关于CR3寄存器的，这部分留到控制寄存器的章节再分析。接下来三行是不同类型PDE的，最后两行是PTE的。其中PDE和PTE有很多属性是重合的。而物理页的属性，就是有PDE和PTE共同决定的。计算方法是将相同属性位的值进行与运算。</p>
+<p>物理页的属性 &#x3D; PDE属性 &amp; PTE属性</p>
+<h2 id="P位"><a href="#P位" class="headerlink" title="P位"></a>P位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-25-58-913745745e113b72fb181b8d6862b42a-p-8d5c7d.png"></p>
+<p>首先来看P（Present）位：存在位。PDE与PTE的P位均位1时，物理页有效；其余情况，物理页不存在。这也解释了为什么PDE的第三行和PTE的第二行可以直接忽略。</p>
+<p>在上一篇文章中，有一个关于<a href="https://happy1wawayu.github.io/2022/03/18/10-10-12%E5%88%86%E9%A1%B5/#0%E5%9C%B0%E5%9D%80%E4%B9%9F%E8%83%BD%E5%AD%98%E5%80%BC%EF%BC%9F">0地址赋值</a>的实验。0地址之所以不能赋值是因为它的PTE的P位为0，在我们修改了PTE的P位，并给它挂上一个物理页后，0地址遍可以赋值了。</p>
+<h2 id="R-x2F-W位"><a href="#R-x2F-W位" class="headerlink" title="R&#x2F;W位"></a>R&#x2F;W位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-27-21-b034176b9f80e03df97fcfe7af55f9b4-RW-a6c90a.png"></p>
+<ul>
+<li>R&#x2F;W &#x3D; 0 只读</li>
+<li>R&#x2F;W &#x3D; 1 可读可写</li>
+</ul>
+<p>R&#x2F;W很好理解，控制写的权限呗，这个位有何用呢？来看一个小实验。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;;</span><br><span class="line">	printf(&quot;%x&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	printf(&quot;%s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>来看这个代码，很明显，执行会是失败的，因为用char*定义的字符串，是会存储在常量区，而不是堆栈中了，又因为常量区的值是不允许修改的，因此</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">*str = &#x27;a&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>这条语句会执行失败并报错。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-27-39-b80e5b84ea59244bed1a5c6dcd3da680-RWCodeBefore-d877ed.png"></p>
+<p>那为什么常量区的内容就不可修改呢？其实，说白了，就是常量区挂着的物理页的R&#x2F;W属性为0，因此只能读，不可写，既然知道了原因，我们只要修改了常量区所在物理页的属性，将R&#x2F;W位置1即可。</p>
+<p>通过printf语句先打印出所在常量区的线性地址，接着拆分跟进PDE和PTE中（具体步骤省略）</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-27-53-c1fc242ea9ff6977acee3581c2f6b9c6-RWWin-8f4a00.png"></p>
+<p>可以发现，PTE的R&#x2F;W位值为0，因此将其修改为1写入，随后运行程序发现，可以成功修改字符串首地址出的字符！</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-01-3f1b4b021d9189dbf19e9afe4e708be0-RWCodeAfter-109b89.png"></p>
+<h2 id="P-x2F-S位"><a href="#P-x2F-S位" class="headerlink" title="P&#x2F;S位"></a>P&#x2F;S位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-10-2dcd53816755424bb3a5290770a8206c-PS-1dfe78.png"></p>
+<p>P&#x2F;S（PageSize）位，只对PDE有意义，位于PDE的第7位。</p>
+<ul>
+<li>PS &#x3D; 1 PDE直接指向物理页，无PTE，低22位为页内偏移。线性地址只能拆成两段（10-22）：页的大小为2的22次方，也就是4MB，俗称“大页”，大页比较少，一般出现在高2G中</li>
+<li>PS &#x3D; 0 就是我们比较熟悉的10-10-12分页，页的大小为4KB</li>
+</ul>
+<h2 id="U-x2F-S位"><a href="#U-x2F-S位" class="headerlink" title="U&#x2F;S位"></a>U&#x2F;S位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-19-80e31527d73ebb09af96d5449db8e044-US-e4961e.png"></p>
+<p>U&#x2F;S（User&#x2F;System）位，位于PDE&#x2F;PTE的第2位。</p>
+<ul>
+<li>U&#x2F;S &#x3D; 0：特权用户</li>
+<li>U&#x2F;S &#x3D; 1：普通用户</li>
+</ul>
+<p>三环程序是不能读写高2G内存的，原因在于高2G内存对应的物理页U&#x2F;S位被置0了，也就是说只有特权用户才能读写高2G的内存。所以，当普通用户想要读取高2G内存时，就可以把U&#x2F;S置1，这样就可以访问高2G内存了。</p>
+<p>当然，理论如此，不过除了U&#x2F;S位外，影响高2G内存读写的还有PCD位和PWT位，这部分内容也要到控制寄存器部分才能讲，所以第二种3环程序读写高2G实验（第一种是通过门提权），就要放到后面实现了，这里只要先记住，U&#x2F;S位是影响访问读写权限的。</p>
+<h3 id="与R-x2F-W的区别"><a href="#与R-x2F-W的区别" class="headerlink" title="与R&#x2F;W的区别"></a>与R&#x2F;W的区别</h3><p>这里需要注意一下U&#x2F;S位与R&#x2F;W位的区别，U&#x2F;S位的读写控制是根据用户的级别，而R&#x2F;W位的控制是直接控制读写，不管你是不是特权用户。</p>
+<h2 id="A位"><a href="#A位" class="headerlink" title="A位"></a>A位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-29-37a2dc13f0cce521096c813fa5c743fc-A-bc4256.png"></p>
+<p>A（Accessed）位于PDE&#x2F;PTE的第5位：表示该物理页是否被访问（读或者写）过，访问过置1，即使只访问一个字节也会导致PDE，PTE置1。</p>
+<h2 id="D位"><a href="#D位" class="headerlink" title="D位"></a>D位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-43-ed7f9fa4d2217f1ef70ac21c89e68b85-D-57108f.png"></p>
+<p>D（Dirty），脏位，是否被写过。0表示没有被写过，1表示被写过</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>以上是关于PDE&#x2F;PTE部分属性的含义，还有一部分位没有涉及到，例如G位，PWT位，PCD位，这些需要讲到控制寄存器和TLB相关概念时再细讲。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>任务门</title>
     <url>/2022/03/17/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
     <content><![CDATA[<h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
@@ -400,51 +400,6 @@
 <p>这样就完成了对R&#x2F;W位的修改，在接下来再次对常量区的值进行修改操作时，便可以成功。</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-46-50-05a67d4539354f9f4778a64126020e49-after-7736fd.png"></p>
 <h2 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int temp;</span><br><span class="line"></span><br><span class="line">__declspec(naked) void ModifyRW() &#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		pushad</span><br><span class="line">		pushfd</span><br><span class="line">	&#125;</span><br><span class="line">	temp = *(int*)0xC0300004;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC0300004 = temp;</span><br><span class="line">	temp = *(int*)0xC000108C;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC000108C = temp;</span><br><span class="line">	</span><br><span class="line">	__asm &#123;</span><br><span class="line">		popfd</span><br><span class="line">		popad</span><br><span class="line">		retf</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;; </span><br><span class="line">	char buffer[6] = &#123;0, 0, 0, 0, 0x4B, 0&#125;;</span><br><span class="line">	printf(&quot;addr: %x, str: %s&quot;, str, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line">	printf(&quot;str: %s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>逆向分析MmIsAddressValid（10-10-12）</title>
-    <url>/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/</url>
-    <content><![CDATA[<p>在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">kd&gt; u MmIsAddressValid</span><br></pre></td></tr></table></figure>
-
-<p>查看。</p>
-<p>为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的MmIsAddressValid函数，就利用了这么一个原理，相比前一篇的基址小实验，这里对于线性地址拆分的过程更为巧妙，让我们一起来看看吧！</p>
-<h2 id="获取PDE属性"><a href="#获取PDE属性" class="headerlink" title="获取PDE属性"></a>获取PDE属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-04-35-dad27cbe16aabf5c4d005018b697acc7-original-ac218c.png"></p>
-<p>首先观察函数主体部分，发现代码并不长，但是有很多跳转，具体跳转内容就不作分析了，主要是分析函数主体：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4661 8bff            mov     edi,edi		//hotpatch</span><br><span class="line">804e4663 55              push    ebp</span><br><span class="line">804e4664 8bec            mov     ebp,esp</span><br><span class="line">804e4666 8b4d08          mov     ecx,dword ptr [ebp+8]	//取第一个参数（线性地址）</span><br><span class="line">804e4669 8bc1            mov     eax,ecx		//赋值到中间变量，方便运算</span><br><span class="line">804e466b c1e814          shr     eax,14h		//逻辑右移20位</span><br><span class="line">804e466e bafc0f0000      mov     edx,0FFCh				</span><br><span class="line">804e4673 23c2            and     eax,edx		//和操作数进行与运算，同时清空最后2位；相当于做了一个乘4的运算，既左移2位</span><br><span class="line">804e4675 2d0000d03f      sub     eax,3FD00000h		//进行减法运算，相当于eax+0xC0300000</span><br><span class="line">804e467a 8b00            mov     eax,dword ptr [eax]	//取PDE的值</span><br><span class="line">804e467c a801            test    al,1			//判断PDE属性P位是否为1</span><br><span class="line">804e467e 0f84d2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e4684 84c0            test    al,al			//判断下标为7的位(PS位)值是否为1</span><br><span class="line">804e4686 7824            js      nt!MmIsAddressValid+0x53 (804e46ac)</span><br></pre></td></tr></table></figure>
-
-<h3 id="巧妙的与运算："><a href="#巧妙的与运算：" class="headerlink" title="巧妙的与运算："></a>巧妙的与运算：</h3><ol>
-<li>首先将线性地址逻辑右移20位，此时还余下12位</li>
-<li>将这12位和操作数0xFFC做一个与运算，0xFFC换算成2进制就是1111 1111 1100。因此做完与运算后，刚刚经过第一步操作还剩下12位的数的低2位，置0了。熟悉移位运算的朋友们知道，这个12位的数，相当于1个10位的数逻辑左移2位得到，换句话说就是将这个10位的数乘4。而这个10位，就是PDI，因此这步操作完了以后，相当于我们获得了PDI*4的值。</li>
-<li>接下来，与0x3FD00000做减法运算，作用相当于加上0xC0300000，两种方法的结果是一样的。因此，我们得到了0xC0300000 + PDI*4的值，而这个值，恰恰就是我们要找的PDE，接着只需要取出里面的值，就可以获取PDE的属性了</li>
-</ol>
-<h3 id="后续跳转"><a href="#后续跳转" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>再获取PDE的属性后，会遇到两个跳转，简单的概括下：</p>
-<ol>
-<li>首先会判断PDE下标为0的位置的值，也就是P位，当P位为0时，说明物理页无效，会跳转到一个相应的处理函数，这里就不再跟进分析</li>
-<li>若物理页P位为1，就会来到第二个跳转，这里test al, al指令会修改标志寄存器，当al的最高位，也就是下标为7的位置值为1时，会被认为是负数，此时会修改EFLAG寄存器的SF位。这时，在第二个跳转的位置，js判断的就是SF的值是否为1，若为1，也就是al下标为7的位置值为1，这是对应的PDE属性PS位，说明这是一个4MB的大页，进而会跳转执行相应的处理函数。</li>
-</ol>
-<h2 id="获取PTE属性"><a href="#获取PTE属性" class="headerlink" title="获取PTE属性"></a>获取PTE属性</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4688 c1e90a          shr     ecx,0Ah		//逻辑右移10位</span><br><span class="line">804e468b 81e1fcff3f00    and     ecx,3FFFFCh		//和操作数进行与运算，同时清空最后2位，相当于PDI左移12位+PTI左移2位</span><br><span class="line">804e4691 81e900000040    sub     ecx,40000000h		//进行减法运算，相当于eax+0xC0000000</span><br><span class="line">804e4697 8bc1            mov     eax,ecx</span><br><span class="line">804e4699 8b08            mov     ecx,dword ptr [eax]	//获取PTE属性</span><br><span class="line">804e469b f6c101          test    cl,1			//判断P位的值是否为0</span><br><span class="line">804e469e 0f84b2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e46a4 84c9            test    cl,cl			//判断PAT是值是否为1</span><br><span class="line">804e46a6 0f88b6de0300    js      nt!MmIsAddressValid+0x3f (80522562)</span><br><span class="line">804e46ac b001            mov     al,1</span><br><span class="line">804e46ae 5d              pop     ebp</span><br><span class="line">804e46af c20400          ret     4</span><br></pre></td></tr></table></figure>
-
-<h3 id="巧妙的与运算"><a href="#巧妙的与运算" class="headerlink" title="巧妙的与运算"></a>巧妙的与运算</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">and ecx, 3FFFFCh</span><br></pre></td></tr></table></figure>
-
-<p>假设线性地址右移10位后的值为 0000 0000 00aa aaaa aaaa bbbb bbbb bbxx（a, b的值为0或者1，这里只是为了区分PDI和PTI）</p>
-<p>然后我们来拆分0x3FFFFC的值：0000 0000 0011 1111 1111 1111 1111 1100</p>
-<p>将两者进行与运算后得到结果为 0000 0000 00aa aaaa aaaa bbbb bbbb bb00</p>
-<p>我们知道，aa aaaa aaaa应为PDI，而bb bbbb bbbb应为PTI，因此可以把得到的结果看作是这样的一个运算：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">aa aaaa aaaa&lt;&lt;12 + bb bbbb bbbb&lt;&lt;2</span><br><span class="line">= aa aaaa aaaa * 2^12 + bb bbbb bbbb * 2^2</span><br><span class="line">= aa aaaa aaaa * 1000h + bb bbbb bbbb * 4h</span><br><span class="line">= PDI*1000h + PTI*4h</span><br></pre></td></tr></table></figure>
-
-<p>因此经过这个与运算后，再通过溢出进行减法运算，获取到PTE的所在位置，便可以取出属性</p>
-<h3 id="后续跳转-1"><a href="#后续跳转-1" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>经过最为关键的步骤，取到了PTE的属性后，还剩下两个跳转，这两个跳转的原理和上述的两个跳转完全一样，分别是取PTE下标为0的P位和下标为7的PAT位，区别仅仅在于，PDE和PTE的下标为7的位的含义不同，所以会跳转进入两个不同的处理函数，这里就不多做分析。</p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>今天的分析主要是弄清楚Windows系统函数是如何获取物理页属性的，同样是通过利用页目录表基址和页表基址，实现用线性地址访问PDE和PTE，在分析时看到，比较关键的一步是两个与运算，非常巧妙，之后再通过减法运算利用溢出达到和加法运算同样的效果，获取到PDE&#x2F;PTE的值。</p>
-]]></content>
       <categories>
         <category>Windows内核</category>
       </categories>
@@ -555,6 +510,51 @@
 </ul>
 <h3 id="谁填充了这些表呢"><a href="#谁填充了这些表呢" class="headerlink" title="谁填充了这些表呢"></a>谁填充了这些表呢</h3><p><strong>进程本身可以通过0xC0300000和0xC0000000访问修改任意物理页</strong>，那么是谁为我们填充0xC0300000和0xC0000000的PDE与PTE呢？</p>
 <p>进程的创建过程：当创建B进程时，先在A进程中将B进程所有信息全部构建好，然后切换Cr3即可。也就是说，最开始的这张表是由A进程填充的。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>逆向分析MmIsAddressValid（10-10-12）</title>
+    <url>/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/</url>
+    <content><![CDATA[<p>在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">kd&gt; u MmIsAddressValid</span><br></pre></td></tr></table></figure>
+
+<p>查看。</p>
+<p>为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的MmIsAddressValid函数，就利用了这么一个原理，相比前一篇的基址小实验，这里对于线性地址拆分的过程更为巧妙，让我们一起来看看吧！</p>
+<h2 id="获取PDE属性"><a href="#获取PDE属性" class="headerlink" title="获取PDE属性"></a>获取PDE属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-04-35-dad27cbe16aabf5c4d005018b697acc7-original-ac218c.png"></p>
+<p>首先观察函数主体部分，发现代码并不长，但是有很多跳转，具体跳转内容就不作分析了，主要是分析函数主体：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4661 8bff            mov     edi,edi		//hotpatch</span><br><span class="line">804e4663 55              push    ebp</span><br><span class="line">804e4664 8bec            mov     ebp,esp</span><br><span class="line">804e4666 8b4d08          mov     ecx,dword ptr [ebp+8]	//取第一个参数（线性地址）</span><br><span class="line">804e4669 8bc1            mov     eax,ecx		//赋值到中间变量，方便运算</span><br><span class="line">804e466b c1e814          shr     eax,14h		//逻辑右移20位</span><br><span class="line">804e466e bafc0f0000      mov     edx,0FFCh				</span><br><span class="line">804e4673 23c2            and     eax,edx		//和操作数进行与运算，同时清空最后2位；相当于做了一个乘4的运算，既左移2位</span><br><span class="line">804e4675 2d0000d03f      sub     eax,3FD00000h		//进行减法运算，相当于eax+0xC0300000</span><br><span class="line">804e467a 8b00            mov     eax,dword ptr [eax]	//取PDE的值</span><br><span class="line">804e467c a801            test    al,1			//判断PDE属性P位是否为1</span><br><span class="line">804e467e 0f84d2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e4684 84c0            test    al,al			//判断下标为7的位(PS位)值是否为1</span><br><span class="line">804e4686 7824            js      nt!MmIsAddressValid+0x53 (804e46ac)</span><br></pre></td></tr></table></figure>
+
+<h3 id="巧妙的与运算："><a href="#巧妙的与运算：" class="headerlink" title="巧妙的与运算："></a>巧妙的与运算：</h3><ol>
+<li>首先将线性地址逻辑右移20位，此时还余下12位</li>
+<li>将这12位和操作数0xFFC做一个与运算，0xFFC换算成2进制就是1111 1111 1100。因此做完与运算后，刚刚经过第一步操作还剩下12位的数的低2位，置0了。熟悉移位运算的朋友们知道，这个12位的数，相当于1个10位的数逻辑左移2位得到，换句话说就是将这个10位的数乘4。而这个10位，就是PDI，因此这步操作完了以后，相当于我们获得了PDI*4的值。</li>
+<li>接下来，与0x3FD00000做减法运算，作用相当于加上0xC0300000，两种方法的结果是一样的。因此，我们得到了0xC0300000 + PDI*4的值，而这个值，恰恰就是我们要找的PDE，接着只需要取出里面的值，就可以获取PDE的属性了</li>
+</ol>
+<h3 id="后续跳转"><a href="#后续跳转" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>再获取PDE的属性后，会遇到两个跳转，简单的概括下：</p>
+<ol>
+<li>首先会判断PDE下标为0的位置的值，也就是P位，当P位为0时，说明物理页无效，会跳转到一个相应的处理函数，这里就不再跟进分析</li>
+<li>若物理页P位为1，就会来到第二个跳转，这里test al, al指令会修改标志寄存器，当al的最高位，也就是下标为7的位置值为1时，会被认为是负数，此时会修改EFLAG寄存器的SF位。这时，在第二个跳转的位置，js判断的就是SF的值是否为1，若为1，也就是al下标为7的位置值为1，这是对应的PDE属性PS位，说明这是一个4MB的大页，进而会跳转执行相应的处理函数。</li>
+</ol>
+<h2 id="获取PTE属性"><a href="#获取PTE属性" class="headerlink" title="获取PTE属性"></a>获取PTE属性</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4688 c1e90a          shr     ecx,0Ah		//逻辑右移10位</span><br><span class="line">804e468b 81e1fcff3f00    and     ecx,3FFFFCh		//和操作数进行与运算，同时清空最后2位，相当于PDI左移12位+PTI左移2位</span><br><span class="line">804e4691 81e900000040    sub     ecx,40000000h		//进行减法运算，相当于eax+0xC0000000</span><br><span class="line">804e4697 8bc1            mov     eax,ecx</span><br><span class="line">804e4699 8b08            mov     ecx,dword ptr [eax]	//获取PTE属性</span><br><span class="line">804e469b f6c101          test    cl,1			//判断P位的值是否为0</span><br><span class="line">804e469e 0f84b2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e46a4 84c9            test    cl,cl			//判断PAT是值是否为1</span><br><span class="line">804e46a6 0f88b6de0300    js      nt!MmIsAddressValid+0x3f (80522562)</span><br><span class="line">804e46ac b001            mov     al,1</span><br><span class="line">804e46ae 5d              pop     ebp</span><br><span class="line">804e46af c20400          ret     4</span><br></pre></td></tr></table></figure>
+
+<h3 id="巧妙的与运算"><a href="#巧妙的与运算" class="headerlink" title="巧妙的与运算"></a>巧妙的与运算</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">and ecx, 3FFFFCh</span><br></pre></td></tr></table></figure>
+
+<p>假设线性地址右移10位后的值为 0000 0000 00aa aaaa aaaa bbbb bbbb bbxx（a, b的值为0或者1，这里只是为了区分PDI和PTI）</p>
+<p>然后我们来拆分0x3FFFFC的值：0000 0000 0011 1111 1111 1111 1111 1100</p>
+<p>将两者进行与运算后得到结果为 0000 0000 00aa aaaa aaaa bbbb bbbb bb00</p>
+<p>我们知道，aa aaaa aaaa应为PDI，而bb bbbb bbbb应为PTI，因此可以把得到的结果看作是这样的一个运算：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">aa aaaa aaaa&lt;&lt;12 + bb bbbb bbbb&lt;&lt;2</span><br><span class="line">= aa aaaa aaaa * 2^12 + bb bbbb bbbb * 2^2</span><br><span class="line">= aa aaaa aaaa * 1000h + bb bbbb bbbb * 4h</span><br><span class="line">= PDI*1000h + PTI*4h</span><br></pre></td></tr></table></figure>
+
+<p>因此经过这个与运算后，再通过溢出进行减法运算，获取到PTE的所在位置，便可以取出属性</p>
+<h3 id="后续跳转-1"><a href="#后续跳转-1" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>经过最为关键的步骤，取到了PTE的属性后，还剩下两个跳转，这两个跳转的原理和上述的两个跳转完全一样，分别是取PTE下标为0的P位和下标为7的PAT位，区别仅仅在于，PDE和PTE的下标为7的位的含义不同，所以会跳转进入两个不同的处理函数，这里就不多做分析。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>今天的分析主要是弄清楚Windows系统函数是如何获取物理页属性的，同样是通过利用页目录表基址和页表基址，实现用线性地址访问PDE和PTE，在分析时看到，比较关键的一步是两个与运算，非常巧妙，之后再通过减法运算利用溢出达到和加法运算同样的效果，获取到PDE&#x2F;PTE的值。</p>
 ]]></content>
       <categories>
         <category>Windows内核</category>
