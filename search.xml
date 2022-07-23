@@ -155,7 +155,7 @@
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">80511987 8b4d08          mov     ecx,dword ptr [ebp+8]	//获取参数</span><br><span class="line">8051198a 56              push    esi	</span><br><span class="line">8051198b 8bc1            mov     eax,ecx</span><br><span class="line">8051198d c1e812          shr     eax,12h		//右移18位</span><br><span class="line">80511990 bef83f0000      mov     esi,3FF8h	</span><br><span class="line">80511995 23c6            and     eax,esi		//进行与运算，余下11位有效位</span><br><span class="line">80511997 2d0000a03f      sub     eax,3FA00000h		//相当于add eax, 0xC0600000</span><br><span class="line">8051199c 8b10            mov     edx,dword ptr [eax]	//取PDE低四字节</span><br><span class="line">8051199e 8b4004          mov     eax,dword ptr [eax+4]	//取PDE高四字节</span><br><span class="line">805119a1 8945fc          mov     dword ptr [ebp-4],eax	//高四字节保存到局部变量</span><br><span class="line">805119a4 8bc2            mov     eax,edx</span><br><span class="line">805119a6 57              push    edi			//保存edi原本的值</span><br><span class="line">805119a7 83e001          and     eax,1			//保留P位的值</span><br><span class="line">805119aa 33ff            xor     edi,edi</span><br><span class="line">805119ac 0bc7            or      eax,edi</span><br></pre></td></tr></table></figure>
 
 <ul>
-<li>右移18位后，进行了一次与运算，保留的位相当于PDPI x 4KB + PDI x 8（看不明白的可以<a href="https://happy1wawayu.github.io/blog/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/#%E5%B7%A7%E5%A6%99%E7%9A%84%E4%B8%8E%E8%BF%90%E7%AE%97%EF%BC%9A">参考这篇</a>）</li>
+<li>右移18位后，进行了一次与运算，保留的位相当于PDPI x 4KB + PDI x 8（看不明白的可以<a href="https://happy1wawayu.github.io/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/#%E5%B7%A7%E5%A6%99%E7%9A%84%E4%B8%8E%E8%BF%90%E7%AE%97%EF%BC%9A">参考这篇</a>）</li>
 <li>sub eax, 0x3FA00000和add eax, 0xC0600000，因此可以推测，<strong>PAE分页下PDT的基址为0xC0600000</strong></li>
 </ul>
 <p>接着分析查找PTE的部分</p>
@@ -177,7 +177,7 @@
 </ol>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">pPDE = (int*)(0xc0600000 + (PDPTI&lt;&lt;12) + (PDI&lt;&lt;3))</span><br><span class="line">pPTE = (int*)(0xc0000000 + (PDPTI&lt;&lt;21) + (PDI&lt;&lt;12) + (PTI&lt;&lt;3))</span><br></pre></td></tr></table></figure>
 
-<h2 id="修改常量区"><a href="#修改常量区" class="headerlink" title="修改常量区"></a>修改常量区</h2><p>在10-10-12分页学习的时候，我们知道通过修改物理页属性，可以使得程序能够修改常量区里的内容。并且在<a href="https://happy1wawayu.github.io/blog/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/">基址小实验</a>那篇中，通过代码实现了修改常量区的操作，利用了基址，从而可以在代码中通过线性地址找到PDE和PTE。这里，在PAE分页下，重做一遍那个实验，原理一样，就不在此赘述了。</p>
+<h2 id="修改常量区"><a href="#修改常量区" class="headerlink" title="修改常量区"></a>修改常量区</h2><p>在10-10-12分页学习的时候，我们知道通过修改物理页属性，可以使得程序能够修改常量区里的内容。并且在<a href="https://happy1wawayu.github.io/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/">基址小实验</a>那篇中，通过代码实现了修改常量区的操作，利用了基址，从而可以在代码中通过线性地址找到PDE和PTE。这里，在PAE分页下，重做一遍那个实验，原理一样，就不在此赘述了。</p>
 <p>首先，直接修改位于常量区的“protect”失败</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-13-39-9e8c4c7f4c98db656730151cacc3d497-constBefore-cd4b4f.png"></p>
 <p>这里采用拆分线性地址的方式计算PDE&#x2F;PTT的具体位置，拆分“protect”所在的线性地址0x423034 -&gt; 0-2-0x23-0x34</p>
@@ -203,73 +203,54 @@
   <entry>
     <title></title>
     <url>/2022/07/23/PDE_PTE%E5%B1%9E%E6%80%A7%EF%BC%88%E9%83%A8%E5%88%86%EF%BC%89/</url>
-    <content><![CDATA[]]></content>
-  </entry>
-  <entry>
-    <title>任务门</title>
-    <url>/2022/03/17/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
-    <content><![CDATA[<h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
-<p>简要概括，任务门有如下优势：</p>
+    <content><![CDATA[<p>上一篇文章中了解了PDE和PTE，这一篇就来了解一下PDE和PTE的属性。</p>
+<h2 id="物理页的属性"><a href="#物理页的属性" class="headerlink" title="物理页的属性"></a>物理页的属性</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/attr.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/attr.png)"></p>
+<p>一上来看这张图，肯定是一脸懵逼的。先从行开始看，第一行是关于CR3寄存器的，这部分留到控制寄存器的章节再分析。接下来三行是不同类型PDE的，最后两行是PTE的。其中PDE和PTE有很多属性是重合的。而物理页的属性，就是有PDE和PTE共同决定的。计算方法是将相同属性位的值进行与运算。</p>
+<p>物理页的属性 &#x3D; PDE属性 &amp; PTE属性</p>
+<h2 id="P位"><a href="#P位" class="headerlink" title="P位"></a>P位</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/p.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/p.png)"></p>
+<p>首先来看P（Present）位：存在位。PDE与PTE的P位均位1时，物理页有效；其余情况，物理页不存在。这也解释了为什么PDE的第三行和PTE的第二行可以直接忽略。</p>
+<p>在上一篇文章中，有一个关于<a href="https://cataloc.gitee.io/blog/2020/03/18/10-10-12%E5%88%86%E9%A1%B5/#0%E5%9C%B0%E5%9D%80%E4%B9%9F%E8%83%BD%E5%AD%98%E5%80%BC%EF%BC%9F">0地址赋值</a>的实验。0地址之所以不能赋值是因为它的PTE的P位为0，在我们修改了PTE的P位，并给它挂上一个物理页后，0地址遍可以赋值了。</p>
+<h2 id="R-x2F-W位"><a href="#R-x2F-W位" class="headerlink" title="R&#x2F;W位"></a>R&#x2F;W位</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/RW.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/RW.png)"></p>
 <ul>
-<li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
-<li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
-<li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
+<li>R&#x2F;W &#x3D; 0 只读</li>
+<li>R&#x2F;W &#x3D; 1 可读可写</li>
 </ul>
-<p>下面为不同表中，任务门进行任务切换的过程：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
-<h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
-<p>任务门描述符的结构非常简单，真正用到的只有24位，属性位里：DPL一般设置为3，方便应用程序访问，Type则是固定的0101，TSS段选择子，顾名思义，就是一个段选择子，指向位于GDT表中TSS段描述符的位置。其余位均为保留位，置0即可。</p>
-<h2 id="任务门实现任务切换"><a href="#任务门实现任务切换" class="headerlink" title="任务门实现任务切换"></a>任务门实现任务切换</h2><p>这一步十分简单，仅仅比使用TSS多了一个步骤而已，这里也不细讲了，直接上步骤。</p>
-<p>首先，编译源文件，下断点，确定TSS的地址，根据地址构造TSS段描述符：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structDesc.png"></p>
-<p>第二步，根据GDT表中构造好的TSS段描述符位置，在IDT表中构造任务门：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structSelect.png"></p>
-<p>第三步，在Windbg中使用!process 0 0指令确定CR3的值，并填入自己的TSS中：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
-<p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>基址小实验（10-10-12）</title>
-    <url>/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/</url>
-    <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过C0300000和C0000000这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
-<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
-<h2 id="测试原始代码"><a href="#测试原始代码" class="headerlink" title="测试原始代码"></a>测试原始代码</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-06-946691fd700d1b1c1e8d4d29276e8289-before-414890.png"></p>
-<p>首先测试原始代码，发现直接修改常量区的字符串，是会失败的</p>
-<h2 id="提权进入0环"><a href="#提权进入0环" class="headerlink" title="提权进入0环"></a>提权进入0环</h2><p>提权这里还是会用到Windbg，根据调用函数的地址，填入段选择子，并通过调用门进行提权（就当复习调用门知识了）</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-13-54-05021cd34209ff0f52323592744b5199-addr-5603f1.png"> </p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-35-144d87388db62a38ec244f39dcc05dbc-windbg-c764d6.png"></p>
-<h2 id="修改R-x2F-W位"><a href="#修改R-x2F-W位" class="headerlink" title="修改R&#x2F;W位"></a>修改R&#x2F;W位</h2><p>提权进入0环后（为啥要提权呢？因为C0300000&#x2F;C0000000都属于高2G的线性地址，3环没法直接访问），就到了我们最关键的步骤了，修改R&#x2F;W位。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">temp = *(int*)0xC0300004;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC0300004 = temp;</span><br><span class="line">temp = *(int*)0xC000108C;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC000108C = temp;</span><br></pre></td></tr></table></figure>
+<p>R&#x2F;W很好理解，控制写的权限呗，这个位有何用呢？来看一个小实验。</p>
+<p>C</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;;</span><br><span class="line">	printf(&quot;%x&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	printf(&quot;%s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>在这之前声明了一个中间变量temp（int类型）。</p>
-<p>具体步骤：</p>
-<ol>
-<li>打印出字符串所在常量区的地址0x423fb0，进行拆分：10-10-12 -&gt; 0x1-0x23-0xfb0</li>
-<li>PDI &#x3D; 0x1，带入公式：PDE &#x3D; C0300000 + 0x1 x 4</li>
-<li>PTI &#x3D; 0x23，带入公式：PTE &#x3D; C0000000 + 0x1 x 1000 + 0x23 x 4</li>
-<li>分别取PDE和PTE处的值，并<strong>和0x2进行或运算（将R&#x2F;W位置1）</strong></li>
-</ol>
-<p>这样就完成了对R&#x2F;W位的修改，在接下来再次对常量区的值进行修改操作时，便可以成功。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-46-50-05a67d4539354f9f4778a64126020e49-after-7736fd.png"></p>
-<h2 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int temp;</span><br><span class="line"></span><br><span class="line">__declspec(naked) void ModifyRW() &#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		pushad</span><br><span class="line">		pushfd</span><br><span class="line">	&#125;</span><br><span class="line">	temp = *(int*)0xC0300004;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC0300004 = temp;</span><br><span class="line">	temp = *(int*)0xC000108C;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC000108C = temp;</span><br><span class="line">	</span><br><span class="line">	__asm &#123;</span><br><span class="line">		popfd</span><br><span class="line">		popad</span><br><span class="line">		retf</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;; </span><br><span class="line">	char buffer[6] = &#123;0, 0, 0, 0, 0x4B, 0&#125;;</span><br><span class="line">	printf(&quot;addr: %x, str: %s&quot;, str, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line">	printf(&quot;str: %s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
+<p>来看这个代码，很明显，执行会是失败的，因为用char*定义的字符串，是会存储在常量区，而不是堆栈中了，又因为常量区的值是不允许修改的，因此</p>
+<p>C</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">*str = &#x27;a&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p>这条语句会执行失败并报错。</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/RWCodeBefore.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/RWCodeBefore.png)"></p>
+<p>那为什么常量区的内容就不可修改呢？其实，说白了，就是常量区挂着的物理页的R&#x2F;W属性为0，因此只能读，不可写，既然知道了原因，我们只要修改了常量区所在物理页的属性，将R&#x2F;W位置1即可。</p>
+<p>通过printf语句先打印出所在常量区的线性地址，接着拆分跟进PDE和PTE中（具体步骤省略）</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/RWWin.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/RWWin.png)"></p>
+<p>可以发现，PTE的R&#x2F;W位值为0，因此将其修改为1写入，随后运行程序发现，可以成功修改字符串首地址出的字符！</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/RWCodeAfter.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/RWCodeAfter.png)"></p>
+<h2 id="P-x2F-S位"><a href="#P-x2F-S位" class="headerlink" title="P&#x2F;S位"></a>P&#x2F;S位</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/PS.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/PS.png)"></p>
+<p>P&#x2F;S（PageSize）位，只对PDE有意义，位于PDE的第7位。</p>
+<ul>
+<li>PS &#x3D; 1 PDE直接指向物理页，无PTE，低22位为页内偏移。线性地址只能拆成两段（10-22）：页的大小为2的22次方，也就是4MB，俗称“大页”，大页比较少，一般出现在高2G中</li>
+<li>PS &#x3D; 0 就是我们比较熟悉的10-10-12分页，页的大小为4KB</li>
+</ul>
+<h2 id="U-x2F-S位"><a href="#U-x2F-S位" class="headerlink" title="U&#x2F;S位"></a>U&#x2F;S位</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/US.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/US.png)"></p>
+<p>U&#x2F;S（User&#x2F;System）位，位于PDE&#x2F;PTE的第2位。</p>
+<ul>
+<li>U&#x2F;S &#x3D; 0：特权用户</li>
+<li>U&#x2F;S &#x3D; 1：普通用户</li>
+</ul>
+<p>三环程序是不能读写高2G内存的，原因在于高2G内存对应的物理页U&#x2F;S位被置0了，也就是说只有特权用户才能读写高2G的内存。所以，当普通用户想要读取高2G内存时，就可以把U&#x2F;S置1，这样就可以访问高2G内存了。</p>
+<p>当然，理论如此，不过除了U&#x2F;S位外，影响高2G内存读写的还有PCD位和PWT位，这部分内容也要到控制寄存器部分才能讲，所以第二种3环程序读写高2G实验（第一种是通过门提权），就要放到后面实现了，这里只要先记住，U&#x2F;S位是影响访问读写权限的。</p>
+<h3 id="与R-x2F-W的区别"><a href="#与R-x2F-W的区别" class="headerlink" title="与R&#x2F;W的区别"></a>与R&#x2F;W的区别</h3><p>这里需要注意一下U&#x2F;S位与R&#x2F;W位的区别，U&#x2F;S位的读写控制是根据用户的级别，而R&#x2F;W位的控制是直接控制读写，不管你是不是特权用户。</p>
+<h2 id="A位"><a href="#A位" class="headerlink" title="A位"></a>A位</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/A.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/A.png)"></p>
+<p>A（Accessed）位于PDE&#x2F;PTE的第5位：表示该物理页是否被访问（读或者写）过，访问过置1，即使只访问一个字节也会导致PDE，PTE置1。</p>
+<h2 id="D位"><a href="#D位" class="headerlink" title="D位"></a>D位</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/D.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/D.png)"></p>
+<p>D（Dirty），脏位，是否被写过。0表示没有被写过，1表示被写过</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>以上是关于PDE&#x2F;PTE部分属性的含义，还有一部分位没有涉及到，例如G位，PWT位，PCD位，这些需要讲到控制寄存器和TLB相关概念时再细讲。</p>
+]]></content>
   </entry>
   <entry>
     <title>任务段</title>
@@ -357,6 +338,39 @@
       </tags>
   </entry>
   <entry>
+    <title>任务门</title>
+    <url>/2022/03/17/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
+    <content><![CDATA[<h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
+<p>简要概括，任务门有如下优势：</p>
+<ul>
+<li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
+<li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
+<li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
+</ul>
+<p>下面为不同表中，任务门进行任务切换的过程：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
+<h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
+<p>任务门描述符的结构非常简单，真正用到的只有24位，属性位里：DPL一般设置为3，方便应用程序访问，Type则是固定的0101，TSS段选择子，顾名思义，就是一个段选择子，指向位于GDT表中TSS段描述符的位置。其余位均为保留位，置0即可。</p>
+<h2 id="任务门实现任务切换"><a href="#任务门实现任务切换" class="headerlink" title="任务门实现任务切换"></a>任务门实现任务切换</h2><p>这一步十分简单，仅仅比使用TSS多了一个步骤而已，这里也不细讲了，直接上步骤。</p>
+<p>首先，编译源文件，下断点，确定TSS的地址，根据地址构造TSS段描述符：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structDesc.png"></p>
+<p>第二步，根据GDT表中构造好的TSS段描述符位置，在IDT表中构造任务门：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structSelect.png"></p>
+<p>第三步，在Windbg中使用!process 0 0指令确定CR3的值，并填入自己的TSS中：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
+<p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>逆向分析MmIsAddressValid（10-10-12）</title>
     <url>/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmlsAddressValid/</url>
     <content><![CDATA[<p>在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令</p>
@@ -392,6 +406,39 @@
 <h3 id="后续跳转-1"><a href="#后续跳转-1" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>经过最为关键的步骤，取到了PTE的属性后，还剩下两个跳转，这两个跳转的原理和上述的两个跳转完全一样，分别是取PTE下标为0的P位和下标为7的PAT位，区别仅仅在于，PDE和PTE的下标为7的位的含义不同，所以会跳转进入两个不同的处理函数，这里就不多做分析。</p>
 <h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>今天的分析主要是弄清楚Windows系统函数是如何获取物理页属性的，同样是通过利用页目录表基址和页表基址，实现用线性地址访问PDE和PTE，在分析时看到，比较关键的一步是两个与运算，非常巧妙，之后再通过减法运算利用溢出达到和加法运算同样的效果，获取到PDE&#x2F;PTE的值。</p>
 ]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>基址小实验（10-10-12）</title>
+    <url>/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/</url>
+    <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过C0300000和C0000000这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
+<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
+<h2 id="测试原始代码"><a href="#测试原始代码" class="headerlink" title="测试原始代码"></a>测试原始代码</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-06-946691fd700d1b1c1e8d4d29276e8289-before-414890.png"></p>
+<p>首先测试原始代码，发现直接修改常量区的字符串，是会失败的</p>
+<h2 id="提权进入0环"><a href="#提权进入0环" class="headerlink" title="提权进入0环"></a>提权进入0环</h2><p>提权这里还是会用到Windbg，根据调用函数的地址，填入段选择子，并通过调用门进行提权（就当复习调用门知识了）</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-13-54-05021cd34209ff0f52323592744b5199-addr-5603f1.png"> </p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-35-144d87388db62a38ec244f39dcc05dbc-windbg-c764d6.png"></p>
+<h2 id="修改R-x2F-W位"><a href="#修改R-x2F-W位" class="headerlink" title="修改R&#x2F;W位"></a>修改R&#x2F;W位</h2><p>提权进入0环后（为啥要提权呢？因为C0300000&#x2F;C0000000都属于高2G的线性地址，3环没法直接访问），就到了我们最关键的步骤了，修改R&#x2F;W位。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">temp = *(int*)0xC0300004;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC0300004 = temp;</span><br><span class="line">temp = *(int*)0xC000108C;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC000108C = temp;</span><br></pre></td></tr></table></figure>
+
+<p>在这之前声明了一个中间变量temp（int类型）。</p>
+<p>具体步骤：</p>
+<ol>
+<li>打印出字符串所在常量区的地址0x423fb0，进行拆分：10-10-12 -&gt; 0x1-0x23-0xfb0</li>
+<li>PDI &#x3D; 0x1，带入公式：PDE &#x3D; C0300000 + 0x1 x 4</li>
+<li>PTI &#x3D; 0x23，带入公式：PTE &#x3D; C0000000 + 0x1 x 1000 + 0x23 x 4</li>
+<li>分别取PDE和PTE处的值，并<strong>和0x2进行或运算（将R&#x2F;W位置1）</strong></li>
+</ol>
+<p>这样就完成了对R&#x2F;W位的修改，在接下来再次对常量区的值进行修改操作时，便可以成功。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-46-50-05a67d4539354f9f4778a64126020e49-after-7736fd.png"></p>
+<h2 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int temp;</span><br><span class="line"></span><br><span class="line">__declspec(naked) void ModifyRW() &#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		pushad</span><br><span class="line">		pushfd</span><br><span class="line">	&#125;</span><br><span class="line">	temp = *(int*)0xC0300004;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC0300004 = temp;</span><br><span class="line">	temp = *(int*)0xC000108C;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC000108C = temp;</span><br><span class="line">	</span><br><span class="line">	__asm &#123;</span><br><span class="line">		popfd</span><br><span class="line">		popad</span><br><span class="line">		retf</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;; </span><br><span class="line">	char buffer[6] = &#123;0, 0, 0, 0, 0x4B, 0&#125;;</span><br><span class="line">	printf(&quot;addr: %x, str: %s&quot;, str, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line">	printf(&quot;str: %s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
       <categories>
         <category>Windows内核</category>
       </categories>
