@@ -1,8 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>中断与异常</title>
+    <url>/2022/03/24/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/</url>
+    <content><![CDATA[<p>保护模式暂时告一段落了，接下来开始API函数调用的学习，来一步步分析Windows在调用API的过程中到底做了些什么事，函数到底是如何实现的。</p>
+<h2 id="Windows-API"><a href="#Windows-API" class="headerlink" title="Windows API"></a>Windows API</h2><ol>
+<li>Application Programming Interface，简称API函数</li>
+<li>Windows有多少个API？ 上万个，主要存放在 <strong>C:\WINDOWS\system32</strong> 下面所有的dll中</li>
+<li>几个重要的DLL<ul>
+<li>Kernel32.dll：最核心的功能模块， 比如管理内存、进程和线程相关的函数等。</li>
+<li>User32.dll：是Windows用户界面相关应用程序接口，如创建窗口和发送消息等。</li>
+<li>GDI32.dll：全称是Graphical Device Interface（图形设备接口），包含用于画图和显示文本的函数。例如，要显示一个程序窗口，就调用了其中的函数来画这个窗口。</li>
+<li>Ntdll.dll：大多数API都会通过这个DLL进入内核（0环）。</li>
+</ul>
+</li>
+</ol>
+<h2 id="分析ReadProcessMemory"><a href="#分析ReadProcessMemory" class="headerlink" title="分析ReadProcessMemory"></a>分析ReadProcessMemory</h2><p>为了能够直观的了解API的调用过程，我们来分析一个Windows API函数，ReadProcessMemory，这个API函数位于Kernel32.dll，功能是读取指定进程的内存，打开IDA我们来看看它都做了些什么。</p>
+<h3 id="ReadProcessMemory"><a href="#ReadProcessMemory" class="headerlink" title="ReadProcessMemory"></a>ReadProcessMemory</h3><p>在Kernel32.dll中选择导出函数，按下Ctrl+F，然后搜索ReadProcessMemory</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/rpmFind.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/rpmFind.png)"></p>
+<p>找到后进入函数主体</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/rpmBody.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/rpmBody.png)"></p>
+<p>我们可以看到，ReadProcessMemory函数总体分为3个部分，首先是参数的压栈，其次调用了一个函数NtReadVirtualMemory，接着就开始处理函数的返回值了，可以发现，真正读取内存的功能并不是在ReadProcessMemory中实现的，所以我们需要进一步去查看NtReadVirtualMemory。</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/rpmExtrn.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/rpmExtrn.png)"></p>
+<p>把鼠标放在NtReadVirtualMemory上，发现该函数是外部函数，不属于Kernel32.dll，所以我们得去Kernel32.dll的导入函数中找一下这个函数属于哪个dll。</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/rpmImports.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/rpmImports.png)"></p>
+<p>可以见得，NtReadVirtualMemory属于Ntdll.dll，接下来进入NtReadVirtualMemory继续分析。</p>
+<h3 id="NtReadVirtualMemory"><a href="#NtReadVirtualMemory" class="headerlink" title="NtReadVirtualMemory"></a>NtReadVirtualMemory</h3><p>找到函数主体的步骤和上面一样，不再赘述。</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/nrvm.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/nrvm.png)"></p>
+<p>NtReadVirtualMemory的函数主体部分只有4行，其中最关键的是前两行：</p>
+<ul>
+<li>mov eax, 0BAh：这一步给eax赋值了一个编号，这个编号的作用是在进入0环后，找到真正需要调用的函数。<strong>记住，这个编号存在eax中。</strong></li>
+<li>mov edx, 7FFE03000h：这一步同样关键，这是一个函数地址。它决定了进入0环的方式（具体在下一篇中会详细分析），同样，也要记住edx存了这个值。</li>
+</ul>
+<p>经过简单的分析，可以发现，在3环层面上， 并没有真正实现函数的功能，<strong>API函数的实现，大部分都在0环</strong>（只有少部分函数是在3环实现）。拿ReadProcessMemory来说，只是相对于0环给上层提供的一个接口，通过这个接口，我们可以实现读取指定地址的内存</p>
+<h2 id="重写API函数"><a href="#重写API函数" class="headerlink" title="重写API函数"></a>重写API函数</h2><p>现在我们知道，API函数的真正实现实际上是在底层（0环），3环上的API函数实际上只是起到一个接口的作用。那么我们可以自己重写3环的API，自己去调用0环函数，这样做的好处是，可以避免3环恶意挂钩（例如有黑客Hook了OpenFile函数，每次我们调用OpenFile时，黑客就知道我们打开了什么文件，如果重写API函数，黑客就无法通过Hook OpenFile函数来获取我们打开的文件内容，除非黑客在0环动手脚）</p>
+<h3 id="实现功能"><a href="#实现功能" class="headerlink" title="实现功能"></a>实现功能</h3><p>[<img src="https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/overwrite.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/overwrite.png)"></p>
+<p>实现的功能大致如此，读取变量a所在地址的内容，将内容改写后，再写入该地址，先用Windows API提供的ReadProcessMemory和WriteProcessMemory实现一遍。可以看到，原本变量a的值为0x123，随后被修改成了0x567</p>
+<h3 id="重写ReadProcessMemory"><a href="#重写ReadProcessMemory" class="headerlink" title="重写ReadProcessMemory"></a>重写ReadProcessMemory</h3><p>这里以ReadProcessMemory为例，在先前的分析中， 我们知道ReadProcessMemory仅仅做了参数压栈的工作，而NtReadVirutalMemory先给eax赋值了一个编号，接着给edx赋了一个函数地址，并调用此函数，然后平衡堆栈。所以我们只需要将这些功能组合一下即可：</p>
+<p>C</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">void _stdcall MyReadProcessMemory(</span><br><span class="line">				HANDLE hProcess,</span><br><span class="line">				LPCVOID lpBaseAddress,</span><br><span class="line">				LPVOID lpBuffer,</span><br><span class="line">				DWORD nSize,</span><br><span class="line">				LPDWORD lpNumberOfBytesRead)</span><br><span class="line">&#123;</span><br><span class="line">	_asm &#123;</span><br><span class="line">		//ReadProcessMemory</span><br><span class="line">		lea eax, [ebp+0x14]</span><br><span class="line">		push eax		//lpNumberOfBytesRead</span><br><span class="line">		push [ebp+0x14]		//nSize</span><br><span class="line">		push [ebp+0x10]		//lpBuffer</span><br><span class="line">		push [ebp+0xC]		//lpBaseAddress</span><br><span class="line">		push [ebp+0x8]		//hProcess</span><br><span class="line"></span><br><span class="line">		//NtReadVirtualMemory</span><br><span class="line">		mov eax, 0xBA</span><br><span class="line">		mov edx, 0x7FFE0300</span><br><span class="line">		call dword ptr [edx]</span><br><span class="line">		add esp, 0x14</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>当然，仅仅这样做还不够，这样虽然编译能过，但是执行会报错。因为在ReadProcessMemory中调用NtReadVirutalMemory用了call语句，<strong>call语句的使用会导致返回地址压栈</strong>，也因此，我们重写的API函数在执行</p>
+<p>Code</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">call dword ptr [edx]</span><br></pre></td></tr></table></figure>
+
+<p>这条语句时，<strong>esp处的值为hProcess</strong>，而Windows在执行这条语句时，**[esp+4]处的值才是hProcess**！如果这里不做修改，后面函数返回时，堆栈会不平衡，因此我们需要手动修改一下堆栈：</p>
+<p>[<img src="https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/modifyStack.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/modifyStack.png)"></p>
+<p>增加了这两行后，我们自己重写的ReadProcessMemory就算完成了。同理，WriteProcessMemory也是如此。</p>
+<h3 id="实验结果"><a href="#实验结果" class="headerlink" title="实验结果"></a>实验结果</h3><p>[<img src="https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/owResult.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/25/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/owResult.png)"></p>
+<p>可以看到，我们使用了自己重写的API函数，但是实现了同样的功能。同理，别的函数也可以通过重写，从而防止3环的恶意挂钩。</p>
+<h3 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h3><p>C</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line">#include </span><br><span class="line">void _stdcall MyReadProcessMemory(</span><br><span class="line">				HANDLE hProcess,</span><br><span class="line">				LPCVOID lpBaseAddress,</span><br><span class="line">				LPVOID lpBuffer,</span><br><span class="line">				DWORD nSize,</span><br><span class="line">				LPDWORD lpNumberOfBytesRead)</span><br><span class="line">&#123;</span><br><span class="line">	_asm &#123;</span><br><span class="line">		//ReadProcessMemory</span><br><span class="line">		lea eax, [ebp+0x14]</span><br><span class="line">		push eax		//lpNumberOfBytesRead</span><br><span class="line">		push [ebp+0x14]		//nSize</span><br><span class="line">		push [ebp+0x10]		//lpBuffer</span><br><span class="line">		push [ebp+0xC]		//lpBaseAddress</span><br><span class="line">		push [ebp+0x8]		//hProcess</span><br><span class="line">		</span><br><span class="line">		//NtReadVirtualMemory</span><br><span class="line">		sub esp, 0x4		//Call NtReadVirtualMemory</span><br><span class="line">		mov eax, 0xBA</span><br><span class="line">		mov edx, 0x7FFE0300</span><br><span class="line">		call dword ptr [edx]</span><br><span class="line">		add esp, 0x18</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">void _stdcall MyWriteProcessMemory(</span><br><span class="line">				HANDLE hProcess,</span><br><span class="line">				LPVOID lpBaseAddress,</span><br><span class="line">				LPVOID lpBuffer,</span><br><span class="line">				DWORD nSize,</span><br><span class="line">				LPDWORD lpNumberOfBytesWritten)</span><br><span class="line">&#123;</span><br><span class="line">	_asm &#123;</span><br><span class="line">		//WriteProcessMemory</span><br><span class="line">		lea eax, [ebp+0x8]	//hProcess</span><br><span class="line">		push eax		//lpNumberOfBytesRead</span><br><span class="line">		push [ebp+0x14]		//NumberOfBytesToWrite</span><br><span class="line">		push [ebp+0x10]		//lpBuffer</span><br><span class="line">		push [ebp+0xC]		//lpBaseAddress</span><br><span class="line">		push [ebp+0x8]		//hProcess</span><br><span class="line">		</span><br><span class="line">		//NtWriteVirtualMemory</span><br><span class="line">		sub esp, 0x4		//Call NtWriteirtualMemory</span><br><span class="line">		mov eax, 0x115</span><br><span class="line">		mov edx, 0x7FFE0300</span><br><span class="line">		call dword ptr [edx]</span><br><span class="line">		add esp, 0x18</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	int a = 0x123;</span><br><span class="line">	int buffer = 0;</span><br><span class="line">	printf(&quot;Before: a=%x&quot;, a);</span><br><span class="line">	MyReadProcessMemory(GetCurrentProcess(), &amp;a, &amp;buffer, 4, NULL);</span><br><span class="line">//	printf(&quot;%x&quot;, buffer);</span><br><span class="line"></span><br><span class="line">	buffer = 0x567;</span><br><span class="line">	getchar();</span><br><span class="line">	MyWriteProcessMemory(GetCurrentProcess(), &amp;a, &amp;buffer, 4, NULL);</span><br><span class="line">	printf(&quot;After: a=%x\n&quot;, a);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>对于API函数的调用过程，我们对三环的部分有了一定的了解，发现，大部分API的实现都是在0环，接下来的文章中，我们就跟进去，找找API函数在0环中的实现在哪。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>系统调用</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>10-10-12分页</title>
-    <url>/2022/03/18/10-10-12%E5%88%86%E9%A1%B5/</url>
+    <url>/2022/03/18/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/10-10-12%E5%88%86%E9%A1%B5/</url>
     <content><![CDATA[<blockquote>
 <p>保护模式下内存管理方式分为两种，段与页。</p>
 <p>前面的篇章中，简要介绍了段的知识，今天就来和大家聊聊页的知识，页是保护模式中更为重要的一环，随着系统进入32-Bit，段的作用明显降低了，取而代之的则是在段的基础上，更为细分的页。</p>
@@ -96,14 +159,14 @@
         <category>Windows内核</category>
       </categories>
       <tags>
-        <tag>保护模式</tag>
         <tag>x86</tag>
         <tag>Windows内核</tag>
+        <tag>保护模式</tag>
       </tags>
   </entry>
   <entry>
     <title>2-9-9-12分页</title>
-    <url>/2022/03/22/2-9-9-12%E5%88%86%E9%A1%B5/</url>
+    <url>/2022/03/22/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/2-9-9-12%E5%88%86%E9%A1%B5/</url>
     <content><![CDATA[<p>在前面的文章中主要介绍了10-10-12分页方式，在这种分页方式下，物理地址最多可达4GB。随着硬件发展，4GB的物理地址范围已经无法满足要求，于是Intel设计了一种新的分页方式：2-9-9-12分页（又称PAE）分页。下面就来了解一下这种分页方式是如何运作的吧。</p>
 <h2 id="PAE分页"><a href="#PAE分页" class="headerlink" title="PAE分页"></a>PAE分页</h2><h3 id="为什么是2-9-9-12"><a href="#为什么是2-9-9-12" class="headerlink" title="为什么是2-9-9-12"></a>为什么是2-9-9-12</h3><p>PAE（Physical Address Extension，物理地址扩展）页，一定会涉及到2个结构，就是PDE和PTE。以PTE来说，它可以直接定位到某个物理页上的物理地址，在10-10-12分页下，由于PTE的大小是4字节(32位)，因此PTE能够寻址的范围仅有4GB。设想，若PTE有33位，那便可以寻址8GB；34位就能寻址16GB……以此类推。Intel考虑到对齐的因素，就干脆直接让PTE的长度达到64位了。这样一个PTE的大小就8字节，又因为一个PTT表的大小是4KB(4096字节)，因此原本一个PTT表里能装下1024个4字节的PTE，现在只能装下512个8字节的PTE了。2的9次方等于512，所以PTI的值为9。</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-18-14-633bdc3b36aec369d0dcf755f7019467-2022-07-23-12-18-10-633bdc3b36aec369d0dcf755f7019467-pti9-7837ad-b483ab.png"></p>
@@ -195,99 +258,14 @@
         <category>Windows内核</category>
       </categories>
       <tags>
-        <tag>保护模式</tag>
         <tag>x86</tag>
         <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>任务段</title>
-    <url>/2022/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/</url>
-    <content><![CDATA[<blockquote>
-<p>在调用门、中断门与陷阱门中，一旦发生权限切换，那么就必有堆栈的切换。而且，由于CS的CPL发生改变，也导致了SS也必须要切换。</p>
-<p>那么问题来了，我们知道EIP和CS的值都可以通过门描述符获得，那么ESP和SS是哪来的？</p>
-<p>这就是引出了今天的内容：<strong>TSS</strong>（Task-state segment），任务状态段。</p>
-</blockquote>
-<h2 id="TSS设计初衷"><a href="#TSS设计初衷" class="headerlink" title="TSS设计初衷"></a>TSS设计初衷</h2><p>想要学习一类知识，首先要了解它被设计出来的目的，这样就能找到方向，更好的了解它。CPU在运行时会频繁的切换任务，每次切换任务时，还没执行完的任务怎么办？总不能下次重新执行吧，于是需要保存上一个任务的上下文环境，于是，TSS诞生了，<strong>TSS是一块大小为104(0x68)个字节的内存</strong>，没错，<strong>TSS</strong>不是什么寄存器，<strong>就是一段内存，或者说是一个段</strong>，这段内存可以保存32-Bit下所有通用寄存器以及段寄存器的值，这样CPU就可以切换到新任务时，仍然保留上一个任务的环境，方便新任务执行完后，能够完好的回到先前的任务继续执行。</p>
-<p>注意，TSS是一个段，有段就有段寄存器和段描述符哟！比如我们熟悉的CS，CS就是<strong>段寄存器</strong>，它描述的是<strong>代码段</strong>，同时，它会通过段选择子从GDT表的<strong>代码段描述符</strong>中载入段的相关信息，通常情况下，代码段的范围是0~FFFFFFFF（大小是4GB）；这样一对比，就可以理解了，TSS也是如此，因为TSS也是一个段（大小是104字节），所以应该存在一个描述TSS的段寄存器从一个段描述符里加载TSS相关信息。这就是今天会依次介绍的TR寄存器和TSS段描述符。</p>
-<p>这里补充一点知识，尽管Intel设计TSS的初衷的为了方便任务切换（<strong>CPU层面叫做任务切换，操作系统层面叫做线程切换</strong>），但是Windows认为这个TSS设计的不好，因此并没有采用这个结构进行线程切换，并且Linux也没有采用TSS进行线程切换，这俩操作系统用的都是堆栈进行线程切换的。那么Windows用到了这个结构没有，当然是用到了，但仅仅用到了ESP0和SS0这两个值。</p>
-<h2 id="TSS结构"><a href="#TSS结构" class="headerlink" title="TSS结构"></a>TSS结构</h2><p>先来看看TSS的结构</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tss.png" alt="img"></p>
-<p>大部分都应该比较熟悉，这里介绍几个较为陌生的字段：</p>
-<ul>
-<li>Previous Task Link：这里保存的是<strong>上一个TSS的段选择子</strong>，比如任务发生了切换，新任务执行完后，如何才能找到先前未能执行完的任务呢？就得依靠这个值了（前面不是说了Windows不用TSS进行线程切换嘛，是呀，但是这里讲解的这个字段的作用，设计初衷就是为了任务切换）</li>
-<li>ESP0&#x2F;SS0：当发生提权时，0环的ESP和SS的值就是从这里取的</li>
-<li>CR3：有人会问，我哪知道取哪个TSS的ESP0和SS0呢？就是这个值的作用了，这个值帮我们<strong>确定当前位于哪个线程</strong>，之后在页的篇章中会学到CR3的相关内容。</li>
-<li>LDT：这个值通常都是0，Windows没有用到LDT表，因为<strong>LDT表只对当前的线程有用</strong></li>
-<li>I&#x2F;O Map：这个位置涉及到硬件IO了，值一般是固定的</li>
-</ul>
-<h2 id="TSS段描述符"><a href="#TSS段描述符" class="headerlink" title="TSS段描述符"></a>TSS段描述符</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/tssDesc.png" alt="](https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tssDesc.png)"></p>
-<p>TSS段描述符只能存在GDT表中，不能存到LDT或者IDT中，所以它的结构和之前介绍的段描述符是类似的，区别在于个别位的不同</p>
-<ul>
-<li>G位：在代码段&#x2F;数据段描述符中，这个位置通常位1，因为这两个段的范围通常是4GB，而TSS的大小是104字节，单位是字节，因此这个值为0</li>
-<li>Type域：这个值为1011或1001，其中B位是Busy位，置1时说明该TSS是否被载入或者嵌套，载入说明CPU正在执行该任务；嵌套则表明该任务处理了一半，切换到了另一个任务中去，但该任务并未执行完。</li>
-<li>Base&#x2F;Limit：Base确定TSS段的起始位置，Limit确定TSS段的大小，Base~Base+Limit就是TSS段的范围。</li>
-</ul>
-<h2 id="TR寄存器"><a href="#TR寄存器" class="headerlink" title="TR寄存器"></a>TR寄存器</h2><p>CPU共有8个段寄存器，TR就是其中之一。</p>
-<p>TR寄存器的工作原理和其它段寄存器一样，通过段选择子加载GDT表的TSS段描述符中的信息，<strong>方便CPU找到TSS的位置</strong>，具体工作原理如下：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tr.png" alt="(https://cataloc.gitee.io/blog/2020/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/tr.png)"></p>
-<p>这里介绍两个操作TR段寄存器的指令LTR和STR：</p>
-<ul>
-<li>LTR：这是一个特权指令，只有0环的程序才能调用；作用是将段选择子写入TR寄存器</li>
-<li>STR：STR不是特权指令，这个指令3环程序也可以调用，所用是读取TR寄存器的值</li>
-</ul>
-<p>需要注意的一点，修改TR寄存器的值，只是会载入新的TSS段描述符信息，并不会对修改前的TSS段造成影响。</p>
-<h2 id="实现任务切换"><a href="#实现任务切换" class="headerlink" title="实现任务切换"></a>实现任务切换</h2><p>虽然说了Windows并没有将TSS用来进行线程切换，但是我们仍然可以手动实现任务的切换。</p>
-<p>直接修改TR寄存器是不能做到任务切换的，但是可以通过JMP FAR或者CALL FAR来加载TSS段描述符来实现。下面分别使用两种方法来实现（两种实现方法细节有很多差别）</p>
-<p>一般情况下，<strong>任务切换发生在下列四种情况</strong>之一：</p>
-<ul>
-<li>当前程序，任务或者进程执行JMP&#x2F;CALL语句，且参数是位于GDT表中的TSS段描述符</li>
-<li>当前程序，任务或者进程执行JMP&#x2F;CALL语句，且参数是位于GDT表或者当前LDT表中的任务门描述符</li>
-<li>一个中断或者异常触发了在IDT表中的任务门描述符</li>
-<li>当前任务执行IRET指令，且EFLAGS寄存器的NT位为1时</li>
-</ul>
-<h3 id="CALL-FAR实现"><a href="#CALL-FAR实现" class="headerlink" title="CALL FAR实现"></a>CALL FAR实现</h3><p>本次CALL FAR实现采用第一种任务切换的情况。</p>
-<p>设计一个TSS，存储任务切换时必要的信息，其中包括ESP0，SS0，CR3，EIP，ESP，段寄存器，位图控制。</p>
-<ul>
-<li>ESP0：也就是任务切换后的堆栈，可以自己创一个空数组，然后写入数组的首地址，就可以作为堆栈使用。</li>
-<li>段寄存器及SS0：这些值，在0环通常都一样，可以进入Windbg参考其它TSS的值，这里使用的是SS&#x2F;SS0 &#x3D; 0x10，ES&#x2F;DS &#x3D; 0x23，CS &#x3D; 0x8，FS &#x3D; 0x30，GS &#x3D; 0x0</li>
-<li>EIP：这就是要跳转后执行的地方，可以写一个裸函数来验证是否切换成功，直接取裸函数地址即可，我这里的值为0x401020（每个人机器可能不一样）</li>
-<li>CR3：这个值，需要在执行前，中断到Windbg寄存器中，通过!process 0 0指令获取。</li>
-<li>位图控制：这是一个默认值为0x20AC0000</li>
-</ul>
-<p>构造完的TSS如下：</p>
-<p>C</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">DWORD tss[0x68] = &#123;</span><br><span class="line">		0x00000000,	//Previous Task Link</span><br><span class="line">		(DWORD)stack,	//ESP0</span><br><span class="line">		0x00000010,	//SS0</span><br><span class="line">		0x00000000, //ESP1</span><br><span class="line">		0x00000000, //SS1</span><br><span class="line">		0x00000000, //ESP2</span><br><span class="line">		0x00000000, //SS2</span><br><span class="line">		(DWORD)Cr3,	//Cr3</span><br><span class="line">		0x00401020,	//EIP</span><br><span class="line">		0x00000000,	//EFLAGS</span><br><span class="line">		0x00000000,	//EAX</span><br><span class="line">		0x00000000,	//ECX</span><br><span class="line">		0x00000000,	//EDX</span><br><span class="line">		0x00000000,	//EBX</span><br><span class="line">		(DWORD)stack,	//ESP</span><br><span class="line">		0x00000000,	//EBP</span><br><span class="line">		0x00000000,	//ESI</span><br><span class="line">		0x00000000,	//EDI</span><br><span class="line">		0x00000023,	//ES</span><br><span class="line">		0x00000008, //CS</span><br><span class="line">		0x00000010,	//SS</span><br><span class="line">		0x00000023,	//DS</span><br><span class="line">		0x00000030,	//FS</span><br><span class="line">		0x00000000,	//GS</span><br><span class="line">		0x00000000,	//LDT</span><br><span class="line">		0x20ac0000	//IO_MAP</span><br><span class="line">	&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>然后我们需要根据这个TSS的地址，来构造我们的TSS段描述符</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tssAddr.png" alt="(https://cataloc.gitee.io/blog/2020/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/tssAddr.png)"></p>
-<p>地址为0x12fd70</p>
-<p>因此TSS段描述符为：0000e912&#96;fd700068，e-&gt;DPL&#x3D;3：是为了3环的程序可以访问这个段描述符，0x68就是104字节，9说明未被载入。然后让我们填入段描述符</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/segDesc.png"></p>
-<p>接着运行程序，需要采集Cr3的值，先中断到Windbg，再通过!process 0 0指令获取，取最后的一个值</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/cr3.png"></p>
-<p>在程序中填入cr3的值后回车，发现可以成功取到任务切换后ESP，CS，SS，并且均为我们设定的值，实验成功。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/callFar.png"></p>
-<p>完整代码如下：</p>
-<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stdafx.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> </span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> saveEax, newESP;</span><br><span class="line"><span class="type">short</span> newCS, newSS;</span><br><span class="line"></span><br><span class="line">__declspec(naked) <span class="function"><span class="type">void</span> <span class="title">Get_Value</span><span class="params">()</span> </span>&#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		mov saveEax, eax</span><br><span class="line">		mov newESP, esp</span><br><span class="line">		mov ax, cs</span><br><span class="line">		mov newCS, ax</span><br><span class="line">		mov ax, ss</span><br><span class="line">		mov newSS, ax</span><br><span class="line">		mov eax, saveEax</span><br><span class="line">		iret</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="type">char</span> stack[<span class="number">100</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">	<span class="type">char</span> buffer[<span class="number">6</span>] = &#123;<span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x4B</span>, <span class="number">0x0</span>&#125;;</span><br><span class="line">	<span class="type">int</span> Cr3 = <span class="number">0</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;Input: &quot;</span>);</span><br><span class="line">	<span class="built_in">scanf</span>(<span class="string">&quot;%x&quot;</span>, &amp;Cr3);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line"></span><br><span class="line">	DWORD tss[<span class="number">0x68</span>] = &#123;</span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//Previous Task Link</span></span><br><span class="line">		(DWORD)stack,	<span class="comment">//ESP0</span></span><br><span class="line">		<span class="number">0x00000010</span>,	<span class="comment">//SS0</span></span><br><span class="line">		<span class="number">0x00000000</span>, <span class="comment">//ESP1</span></span><br><span class="line">		<span class="number">0x00000000</span>, <span class="comment">//SS1</span></span><br><span class="line">		<span class="number">0x00000000</span>, <span class="comment">//ESP2</span></span><br><span class="line">		<span class="number">0x00000000</span>, <span class="comment">//SS2</span></span><br><span class="line">		(DWORD)Cr3,	<span class="comment">//Cr3</span></span><br><span class="line">		<span class="number">0x00401020</span>,	<span class="comment">//EIP</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EFLAGS</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EAX</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//ECX</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EDX</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EBX</span></span><br><span class="line">		(DWORD)stack,	<span class="comment">//ESP</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EBP</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//ESI</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EDI</span></span><br><span class="line">		<span class="number">0x00000023</span>,	<span class="comment">//ES</span></span><br><span class="line">		<span class="number">0x00000008</span>, <span class="comment">//CS</span></span><br><span class="line">		<span class="number">0x00000010</span>,	<span class="comment">//SS</span></span><br><span class="line">		<span class="number">0x00000023</span>,	<span class="comment">//DS</span></span><br><span class="line">		<span class="number">0x00000030</span>,	<span class="comment">//FS</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//GS</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//LDT</span></span><br><span class="line">		<span class="number">0x20ac0000</span>	<span class="comment">//IO_MAP</span></span><br><span class="line">	&#125;;</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;ESP: %x, cs: %x, ss: %x&quot;</span>, newESP, newCS, newSS);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="JMP-FAR实现"><a href="#JMP-FAR实现" class="headerlink" title="JMP FAR实现"></a>JMP FAR实现</h3><p>还有另一种方法，是通过JMP FAR来实现，而且JMP FAR实现会更加困难一些。这里简要概括一下，当使用CALL FAR时，CPU会自动帮你用当前任务的段选择子填写你TSS的Previous Task Link字段，同时给你的Eflags的NT位置1，这个NT位有什么用呢，就是关系到iret这个指令的意义，当Elfags的NT为1时，iret表示根据Previous Task Link的值，从当前任务返回到前一个任务中去，当NT为0时，这是一个中断返回指令。而当你使用JMP FAR实现时，你需要手动给Pervious Task Link字段赋上前一个任务的段选择子，此外你需要手动给Eflags的NT位置1，当然这可以通过</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">pushfd</span><br><span class="line">mov eax, [esp]</span><br><span class="line">or eax, 0x4000</span><br><span class="line">mov [esp], eax</span><br><span class="line">popfd</span><br></pre></td></tr></table></figure>
-
-<p>来实现，此外，还需要确保前一个TSS段的段描述符Busy位的值为1，这样才能确保该任务处在嵌入的状态。</p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
         <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
       </tags>
   </entry>
   <entry>
     <title>PDE_PTE属性（部分）</title>
-    <url>/2022/03/19/PDE_PTE%E5%B1%9E%E6%80%A7/</url>
+    <url>/2022/03/19/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/PDE_PTE%E5%B1%9E%E6%80%A7/</url>
     <content><![CDATA[<p>上一篇文章中了解了PDE和PTE，这一篇就来了解一下PDE和PTE的属性。</p>
 <h2 id="物理页的属性"><a href="#物理页的属性" class="headerlink" title="物理页的属性"></a>物理页的属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-25-46-9b5dc5ae7b30714e111bdf929c88d08d-attr-2149b9.png"></p>
 <p>一上来看这张图，肯定是一脸懵逼的。先从行开始看，第一行是关于CR3寄存器的，这部分留到控制寄存器的章节再分析。接下来三行是不同类型PDE的，最后两行是PTE的。其中PDE和PTE有很多属性是重合的。而物理页的属性，就是有PDE和PTE共同决定的。计算方法是将相同属性位的值进行与运算。</p>
@@ -343,327 +321,14 @@
         <category>Windows内核</category>
       </categories>
       <tags>
-        <tag>保护模式</tag>
         <tag>x86</tag>
         <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>任务门</title>
-    <url>/2022/03/17/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
-    <content><![CDATA[<h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
-<p>简要概括，任务门有如下优势：</p>
-<ul>
-<li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
-<li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
-<li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
-</ul>
-<p>下面为不同表中，任务门进行任务切换的过程：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
-<h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
-<p>任务门描述符的结构非常简单，真正用到的只有24位，属性位里：DPL一般设置为3，方便应用程序访问，Type则是固定的0101，TSS段选择子，顾名思义，就是一个段选择子，指向位于GDT表中TSS段描述符的位置。其余位均为保留位，置0即可。</p>
-<h2 id="任务门实现任务切换"><a href="#任务门实现任务切换" class="headerlink" title="任务门实现任务切换"></a>任务门实现任务切换</h2><p>这一步十分简单，仅仅比使用TSS多了一个步骤而已，这里也不细讲了，直接上步骤。</p>
-<p>首先，编译源文件，下断点，确定TSS的地址，根据地址构造TSS段描述符：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structDesc.png"></p>
-<p>第二步，根据GDT表中构造好的TSS段描述符位置，在IDT表中构造任务门：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structSelect.png"></p>
-<p>第三步，在Windbg中使用!process 0 0指令确定CR3的值，并填入自己的TSS中：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
-<p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
         <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>基址小实验（10-10-12）</title>
-    <url>/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/</url>
-    <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过<code>0xC0300000</code>和<code>0xC0000000</code>这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
-<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://happy1wawayu.github.io/2022/03/19/PDE_PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
-<h2 id="测试原始代码"><a href="#测试原始代码" class="headerlink" title="测试原始代码"></a>测试原始代码</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-06-946691fd700d1b1c1e8d4d29276e8289-before-414890.png"></p>
-<p>首先测试原始代码，发现直接修改常量区的字符串，是会失败的</p>
-<h2 id="提权进入0环"><a href="#提权进入0环" class="headerlink" title="提权进入0环"></a>提权进入0环</h2><p>提权这里还是会用到Windbg，根据调用函数的地址，填入段选择子，并通过调用门进行提权（就当复习调用门知识了）</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-13-54-05021cd34209ff0f52323592744b5199-addr-5603f1.png"> </p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-35-144d87388db62a38ec244f39dcc05dbc-windbg-c764d6.png"></p>
-<h2 id="修改R-x2F-W位"><a href="#修改R-x2F-W位" class="headerlink" title="修改R&#x2F;W位"></a>修改R&#x2F;W位</h2><p>提权进入0环后（为啥要提权呢？因为C0300000&#x2F;C0000000都属于高2G的线性地址，3环没法直接访问），就到了我们最关键的步骤了，修改R&#x2F;W位。</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">temp = *(int*)0xC0300004;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC0300004 = temp;</span><br><span class="line">temp = *(int*)0xC000108C;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC000108C = temp;</span><br></pre></td></tr></table></figure>
-
-<p>在这之前声明了一个中间变量temp（int类型）。</p>
-<p>具体步骤：</p>
-<ol>
-<li>打印出字符串所在常量区的地址0x423fb0，进行拆分：10-10-12 -&gt; 0x1-0x23-0xfb0</li>
-<li>PDI &#x3D; 0x1，带入公式：PDE &#x3D; C0300000 + 0x1 x 4</li>
-<li>PTI &#x3D; 0x23，带入公式：PTE &#x3D; C0000000 + 0x1 x 1000 + 0x23 x 4</li>
-<li>分别取PDE和PTE处的值，并<strong>和0x2进行或运算（将R&#x2F;W位置1）</strong></li>
-</ol>
-<p>这样就完成了对R&#x2F;W位的修改，在接下来再次对常量区的值进行修改操作时，便可以成功。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-46-50-05a67d4539354f9f4778a64126020e49-after-7736fd.png"></p>
-<h2 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int temp;</span><br><span class="line"></span><br><span class="line">__declspec(naked) void ModifyRW() &#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		pushad</span><br><span class="line">		pushfd</span><br><span class="line">	&#125;</span><br><span class="line">	temp = *(int*)0xC0300004;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC0300004 = temp;</span><br><span class="line">	temp = *(int*)0xC000108C;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC000108C = temp;</span><br><span class="line">	</span><br><span class="line">	__asm &#123;</span><br><span class="line">		popfd</span><br><span class="line">		popad</span><br><span class="line">		retf</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;; </span><br><span class="line">	char buffer[6] = &#123;0, 0, 0, 0, 0x4B, 0&#125;;</span><br><span class="line">	printf(&quot;addr: %x, str: %s&quot;, str, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line">	printf(&quot;str: %s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>页目录&amp;页表基址</title>
-    <url>/2022/03/20/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&amp;%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/</url>
-    <content><![CDATA[<blockquote>
-<p>考虑这样一个问题，我们现在可以通过在Windbg里找到线性地址所在的物理页，通过修改物理页的属性，就可以实现一些原本受限的功能。例如将常量区对应的物理页R&#x2F;W属性修改为1，便可以修改位于常量区的元素。</p>
-<p>但是，以上操作都是基于Windbg在双击调试的环境中实现的，那么一旦脱离了调试器，该如何通过代码来实现对物理页属性的修改呢？这就需要借助于页目录表基址和页表基址了。</p>
-</blockquote>
-<h2 id="页目录表基址"><a href="#页目录表基址" class="headerlink" title="页目录表基址"></a>页目录表基址</h2><p>结论：C0300000就是页目录表基址，接下来我们来验证这个结论。</p>
-<h3 id="C0300000拆分"><a href="#C0300000拆分" class="headerlink" title="C0300000拆分"></a>C0300000拆分</h3><p>C0300000： 1100 0000 0011 0000 0000 0000 0000 0000</p>
-<table>
-<thead>
-<tr>
-<th>每部分位数</th>
-<th>二进制</th>
-<th>十六进制</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>10</td>
-<td>11 0000 0000</td>
-<td>300</td>
-</tr>
-<tr>
-<td>10</td>
-<td>11 0000 0000</td>
-<td>300</td>
-</tr>
-<tr>
-<td>12</td>
-<td>0000 0000 0000</td>
-<td>0</td>
-</tr>
-</tbody></table>
-<h3 id="Cr3"><a href="#Cr3" class="headerlink" title="Cr3"></a>Cr3</h3><p>这里以记事本(notepad.exe)为例，来验证一下，C0300000就是页目录表基址，首先查看记事本对应的Cr3指向的物理地址。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-12-35-af0a5d5b7923dd573fb3d855028827d3-pdtCr3-78a409.png" alt="img"></p>
-<p>我们知道，Cr3指向的是PDT的首地址，这里可以看到4个PDE有值。</p>
-<h3 id="查看C0300000物理页"><a href="#查看C0300000物理页" class="headerlink" title="查看C0300000物理页"></a>查看C0300000物理页</h3><p>接下来的步骤就是比较熟悉的，根据拆分后的线性地址，寻找物理页的过程了。但是这一次，要慢点看。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-12-52-9cbeb02851de3f150542cb2966906361-pdtPde-3ea291.png" alt="img"></p>
-<p>这一步很容易理解，Cr3.base + 300*4，通过Cr3和线性地址的前10位，我们找到了PDE的值：7ea49063</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-03-9cbeb02851de3f150542cb2966906361-pdtPde-c1e116.png" alt="img"></p>
-<p>什么？又重复了一遍？实际上不是，由于PDE的值为7ea49063，后12位是属性位，因此，7ea49000是我们要找的PTT的首地址，然后通过PTT.base + 300*4，就得到了PTE的值：7ea49063。</p>
-<p>有了PTE的值，加上最后12位的偏移（此处为0），就可以找到物理页。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-21-a14aa5e484cdf9c52446f449fe68b380-pdtPte-9bc48f.png" alt="img"></p>
-<p>得到结果后，是不是很惊讶？C0300000这个<strong>线性地址对应的物理页上的物理地址</strong>，竟然和Cr3指向的物理地址完全一样！也就是说，以后不需要Cr3，只需在当前程序内，通过C0300000这个线性地址就可以得到当前程序PDT的首地址了</p>
-<h3 id="如何利用"><a href="#如何利用" class="headerlink" title="如何利用"></a>如何利用</h3><p>是啊，C0300000这个地址有啥用呢？当然有用，而且非常有用。回到文章开头的问题，我们该如何在不使用Windbg的情况下，修改物理页的属性呢？</p>
-<p>我们知道，想要修改物理页的属性，需要先修改物理页对应的PDE和PTE，那要如何找到PDE和PTE呢，由于<strong>在编写代码时，用到的都是线性地址</strong>，而C0300000这个线性地址刚好就可以找到PDT的首地址，这样我们拆分想要修改的物理页属性的线性地址，将前10位加上C0300000即可找到对应的PDE。</p>
-<p>既然PDE找到了，那不就有了PTT的首地址，这样PTE不也就可以找到了吗？并不是这样，尽管找到了PDE，但是由于<strong>PDE里面存着的是物理地址，如果直接访问PDE里面存的那个地址，在代码中会转变为一个线性地址</strong>，因此并不能通过PDE获取PTT的首地址，也就不能获取到PTE了，想要找到PTE，还得需要用到另外一个基地址，就是页表基址。</p>
-<h2 id="页表基址"><a href="#页表基址" class="headerlink" title="页表基址"></a>页表基址</h2><p>还是直接上结论，页表基址：C0000000</p>
-<p>接下来我们来验证。</p>
-<h3 id="C0000000拆分"><a href="#C0000000拆分" class="headerlink" title="C0000000拆分"></a>C0000000拆分</h3><p>C0000000： 1100 0000 0000 0000 0000 0000 0000 0000</p>
-<table>
-<thead>
-<tr>
-<th>每部分位数</th>
-<th>二进制</th>
-<th>十六进制</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>10</td>
-<td>11 0000 0000</td>
-<td>300</td>
-</tr>
-<tr>
-<td>10</td>
-<td>00 0000 0000</td>
-<td>0</td>
-</tr>
-<tr>
-<td>12</td>
-<td>0000 0000 0000</td>
-<td>0</td>
-</tr>
-</tbody></table>
-<h3 id="Cr3-1"><a href="#Cr3-1" class="headerlink" title="Cr3"></a>Cr3</h3><p>这里还是以记事本(notepad.exe)为例：</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-43-93925f55bcc80aeec601d2b6fb776733-pttCr3-a7d53d.png" alt="img"></p>
-<p>我们查看Cr3指向的物理地址，当前共有4个PDE的有值的，而PDE的值，就是PTT的首地址，以第一个PDE（36c24067）为例，<strong>其中PTT的首地址为36c24000</strong>。</p>
-<h3 id="查看C0000000物理页"><a href="#查看C0000000物理页" class="headerlink" title="查看C0000000物理页"></a>查看C0000000物理页</h3><p>步骤和之前一样，就直接看结果好了。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-59-4a3cfbb23500f11b6115328b7352592e-pttPte-2f9739.png" alt="img"></p>
-<p>发现，C0000000这个线性地址所对应的物理页，刚好是36c24000，也就是第一个PDE对应的PTT的首地址。由此可以进一步推断，C0001000则是第二个PDE对应的PTT的首地址，以此类推。</p>
-<h2 id="再看10-10-12分页"><a href="#再看10-10-12分页" class="headerlink" title="再看10-10-12分页"></a>再看10-10-12分页</h2><p>现在再来看10-10-12分页时，看法就会有所不一样了。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-14-13-2ddf8fc54f95bffe55fbdd3b95417dbc-10-10-12-54e377.png" alt="img"></p>
-<ol>
-<li>实际上页表（PTT）被映射到了从0xC0000000到0xC03FFFFF的4M地址空间</li>
-<li>在这1024个表中有一张特殊的表：页目录表（PDT）</li>
-<li>页目录表（PDT）被映射到了0xC030000开始处的4KB大小的地址空间</li>
-</ol>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="有了0xC0300000和0xC0000000能做什么？"><a href="#有了0xC0300000和0xC0000000能做什么？" class="headerlink" title="有了0xC0300000和0xC0000000能做什么？"></a>有了0xC0300000和0xC0000000能做什么？</h3><p>掌握了这两个地址，就掌握了一个进程所有的物理内存读写权限。</p>
-<p>公式总结：</p>
-<ul>
-<li>什么是PDI和PTI？ 将32位线性地址拆分位10(PDI)-10(PTI)-12</li>
-<li>访问页目录表(PDT)的公式：0xC0300000 + PDI x 4</li>
-<li>访问页表(PTT)的公式：0xC0000000 + PDI x 1000 + PTI x 4（不用*号因为会被转义）</li>
-</ul>
-<h3 id="其它关于页的细节"><a href="#其它关于页的细节" class="headerlink" title="其它关于页的细节"></a>其它关于页的细节</h3><ul>
-<li>高2G有一些大页，即4MB页</li>
-<li>两个进程低2G几乎不同，高2G几乎相同</li>
-<li>一个进程低2G的内存空间，前64K与后64K是没有使用的（线性地址0 - 00010000 与 7FFF0000 - 7FFFFFFFF）</li>
-</ul>
-<h3 id="谁填充了这些表呢"><a href="#谁填充了这些表呢" class="headerlink" title="谁填充了这些表呢"></a>谁填充了这些表呢</h3><p><strong>进程本身可以通过0xC0300000和0xC0000000访问修改任意物理页</strong>，那么是谁为我们填充0xC0300000和0xC0000000的PDE与PTE呢？</p>
-<p>进程的创建过程：当创建B进程时，先在A进程中将B进程所有信息全部构建好，然后切换Cr3即可。也就是说，最开始的这张表是由A进程填充的。</p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>逆向分析MmIsAddressValid（10-10-12）</title>
-    <url>/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/</url>
-    <content><![CDATA[<p>在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">kd&gt; u MmIsAddressValid</span><br></pre></td></tr></table></figure>
-
-<p>查看。</p>
-<p>为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的MmIsAddressValid函数，就利用了这么一个原理，相比前一篇的基址小实验，这里对于线性地址拆分的过程更为巧妙，让我们一起来看看吧！</p>
-<h2 id="获取PDE属性"><a href="#获取PDE属性" class="headerlink" title="获取PDE属性"></a>获取PDE属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-04-35-dad27cbe16aabf5c4d005018b697acc7-original-ac218c.png"></p>
-<p>首先观察函数主体部分，发现代码并不长，但是有很多跳转，具体跳转内容就不作分析了，主要是分析函数主体：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4661 8bff            mov     edi,edi		//hotpatch</span><br><span class="line">804e4663 55              push    ebp</span><br><span class="line">804e4664 8bec            mov     ebp,esp</span><br><span class="line">804e4666 8b4d08          mov     ecx,dword ptr [ebp+8]	//取第一个参数（线性地址）</span><br><span class="line">804e4669 8bc1            mov     eax,ecx		//赋值到中间变量，方便运算</span><br><span class="line">804e466b c1e814          shr     eax,14h		//逻辑右移20位</span><br><span class="line">804e466e bafc0f0000      mov     edx,0FFCh				</span><br><span class="line">804e4673 23c2            and     eax,edx		//和操作数进行与运算，同时清空最后2位；相当于做了一个乘4的运算，既左移2位</span><br><span class="line">804e4675 2d0000d03f      sub     eax,3FD00000h		//进行减法运算，相当于eax+0xC0300000</span><br><span class="line">804e467a 8b00            mov     eax,dword ptr [eax]	//取PDE的值</span><br><span class="line">804e467c a801            test    al,1			//判断PDE属性P位是否为1</span><br><span class="line">804e467e 0f84d2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e4684 84c0            test    al,al			//判断下标为7的位(PS位)值是否为1</span><br><span class="line">804e4686 7824            js      nt!MmIsAddressValid+0x53 (804e46ac)</span><br></pre></td></tr></table></figure>
-
-<h3 id="巧妙的与运算："><a href="#巧妙的与运算：" class="headerlink" title="巧妙的与运算："></a>巧妙的与运算：</h3><ol>
-<li>首先将线性地址逻辑右移20位，此时还余下12位</li>
-<li>将这12位和操作数0xFFC做一个与运算，0xFFC换算成2进制就是1111 1111 1100。因此做完与运算后，刚刚经过第一步操作还剩下12位的数的低2位，置0了。熟悉移位运算的朋友们知道，这个12位的数，相当于1个10位的数逻辑左移2位得到，换句话说就是将这个10位的数乘4。而这个10位，就是PDI，因此这步操作完了以后，相当于我们获得了PDI*4的值。</li>
-<li>接下来，与0x3FD00000做减法运算，作用相当于加上0xC0300000，两种方法的结果是一样的。因此，我们得到了0xC0300000 + PDI*4的值，而这个值，恰恰就是我们要找的PDE，接着只需要取出里面的值，就可以获取PDE的属性了</li>
-</ol>
-<h3 id="后续跳转"><a href="#后续跳转" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>再获取PDE的属性后，会遇到两个跳转，简单的概括下：</p>
-<ol>
-<li>首先会判断PDE下标为0的位置的值，也就是P位，当P位为0时，说明物理页无效，会跳转到一个相应的处理函数，这里就不再跟进分析</li>
-<li>若物理页P位为1，就会来到第二个跳转，这里test al, al指令会修改标志寄存器，当al的最高位，也就是下标为7的位置值为1时，会被认为是负数，此时会修改EFLAG寄存器的SF位。这时，在第二个跳转的位置，js判断的就是SF的值是否为1，若为1，也就是al下标为7的位置值为1，这是对应的PDE属性PS位，说明这是一个4MB的大页，进而会跳转执行相应的处理函数。</li>
-</ol>
-<h2 id="获取PTE属性"><a href="#获取PTE属性" class="headerlink" title="获取PTE属性"></a>获取PTE属性</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4688 c1e90a          shr     ecx,0Ah		//逻辑右移10位</span><br><span class="line">804e468b 81e1fcff3f00    and     ecx,3FFFFCh		//和操作数进行与运算，同时清空最后2位，相当于PDI左移12位+PTI左移2位</span><br><span class="line">804e4691 81e900000040    sub     ecx,40000000h		//进行减法运算，相当于eax+0xC0000000</span><br><span class="line">804e4697 8bc1            mov     eax,ecx</span><br><span class="line">804e4699 8b08            mov     ecx,dword ptr [eax]	//获取PTE属性</span><br><span class="line">804e469b f6c101          test    cl,1			//判断P位的值是否为0</span><br><span class="line">804e469e 0f84b2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e46a4 84c9            test    cl,cl			//判断PAT是值是否为1</span><br><span class="line">804e46a6 0f88b6de0300    js      nt!MmIsAddressValid+0x3f (80522562)</span><br><span class="line">804e46ac b001            mov     al,1</span><br><span class="line">804e46ae 5d              pop     ebp</span><br><span class="line">804e46af c20400          ret     4</span><br></pre></td></tr></table></figure>
-
-<h3 id="巧妙的与运算"><a href="#巧妙的与运算" class="headerlink" title="巧妙的与运算"></a>巧妙的与运算</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">and ecx, 3FFFFCh</span><br></pre></td></tr></table></figure>
-
-<p>假设线性地址右移10位后的值为 0000 0000 00aa aaaa aaaa bbbb bbbb bbxx（a, b的值为0或者1，这里只是为了区分PDI和PTI）</p>
-<p>然后我们来拆分0x3FFFFC的值：0000 0000 0011 1111 1111 1111 1111 1100</p>
-<p>将两者进行与运算后得到结果为 0000 0000 00aa aaaa aaaa bbbb bbbb bb00</p>
-<p>我们知道，aa aaaa aaaa应为PDI，而bb bbbb bbbb应为PTI，因此可以把得到的结果看作是这样的一个运算：</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">aa aaaa aaaa&lt;&lt;12 + bb bbbb bbbb&lt;&lt;2</span><br><span class="line">= aa aaaa aaaa * 2^12 + bb bbbb bbbb * 2^2</span><br><span class="line">= aa aaaa aaaa * 1000h + bb bbbb bbbb * 4h</span><br><span class="line">= PDI*1000h + PTI*4h</span><br></pre></td></tr></table></figure>
-
-<p>因此经过这个与运算后，再通过溢出进行减法运算，获取到PTE的所在位置，便可以取出属性</p>
-<h3 id="后续跳转-1"><a href="#后续跳转-1" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>经过最为关键的步骤，取到了PTE的属性后，还剩下两个跳转，这两个跳转的原理和上述的两个跳转完全一样，分别是取PTE下标为0的P位和下标为7的PAT位，区别仅仅在于，PDE和PTE的下标为7的位的含义不同，所以会跳转进入两个不同的处理函数，这里就不多做分析。</p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>今天的分析主要是弄清楚Windows系统函数是如何获取物理页属性的，同样是通过利用页目录表基址和页表基址，实现用线性地址访问PDE和PTE，在分析时看到，比较关键的一步是两个与运算，非常巧妙，之后再通过减法运算利用溢出达到和加法运算同样的效果，获取到PDE&#x2F;PTE的值。</p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>中断与异常</title>
-    <url>/2022/03/24/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/</url>
-    <content><![CDATA[<h2 id="中断"><a href="#中断" class="headerlink" title="中断"></a>中断</h2><h3 id="什么是中断"><a href="#什么是中断" class="headerlink" title="什么是中断"></a>什么是中断</h3><ol>
-<li>中断通常是由CPU外部的输入输出设别（<strong>硬件</strong>）所触发的，供外部设备通知CPU“有事情需要处理”，因此又叫做中断请求（<strong>IRQ-Interrupt Request</strong>）</li>
-<li>中断请求的目的是希望CPU暂时停止执行当前<strong>正在执行</strong>的程序，转去执行中断请求所对应的中断处理例程（<strong>中断处理程序在哪由IDT表决定</strong>）</li>
-<li>80x86有两条中断请求线：<ul>
-<li>不可屏蔽中断线，称为<strong>NMI（NonMaskable Interrupt）</strong></li>
-<li>可屏蔽中断线，称为<strong>INTR（Interrupt Require）</strong></li>
-</ul>
-</li>
-</ol>
-<h3 id="不可屏蔽中断"><a href="#不可屏蔽中断" class="headerlink" title="不可屏蔽中断"></a>不可屏蔽中断</h3><table>
-<thead>
-<tr>
-<th>（IDT表）中断号</th>
-<th>NMI</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>0x2</td>
-<td>不可屏蔽中断</td>
-<td>80x86中固定为0x2</td>
-</tr>
-</tbody></table>
-<p>说明：</p>
-<ul>
-<li>当不可屏蔽中断产生时，CPU在执行完当前指令后会立即进入2号中断，执行相应中断处理程序</li>
-<li>不可屏蔽中断不受EFLAG寄存器中IF位的影响，一旦发生，CPU必须处理</li>
-</ul>
-<h3 id="可屏蔽中断"><a href="#可屏蔽中断" class="headerlink" title="可屏蔽中断"></a>可屏蔽中断</h3><p>在硬件级，可屏蔽中断是由一块专门的芯片来管理的，通常称为<strong>中断控制器</strong>。它负责分配中断资源和管理各个中断源发出的中断请求。为了便于标识各个中断请求，中断控制器通常用<strong>IRQ（Interrupt Request）</strong>后面加上数字来表示不同的中断。</p>
-<p>例如：在Windows中，时钟中断的IRQ编号为0，也就是：IRQ0</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-09-44-12c11df6822da09bd28c093a1bcf7e9d-time-785f23.png"></p>
-<table>
-<thead>
-<tr>
-<th>（IDT表）中断号</th>
-<th>IRQ</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>0x30</td>
-<td>IRQ0</td>
-<td>时钟中断</td>
-</tr>
-<tr>
-<td>0x31~0x3F</td>
-<td>IRQ1~IRQ15</td>
-<td>其它硬件设备的中断</td>
-</tr>
-</tbody></table>
-<p>说明：</p>
-<ul>
-<li>如果自己的程序执行时不希望CPU去处理这些中断，可以用<strong>CLI</strong>指令清空EFLAG寄存器中的IF位。与CLI指令相反，<strong>STI</strong>指令可以用来设置EFLAG寄存器中的IF位</li>
-<li>硬件中断与IDT表中的对应关系并且固定不变的，参见<strong>APIC</strong>（高级可编程中断控制器）</li>
-</ul>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-09-52-aab31730dd09f458c47fcdca4df3fd67-APIC-1df766.png"></p>
-<h2 id="异常"><a href="#异常" class="headerlink" title="异常"></a>异常</h2><p>聊完了中断，来看看异常。异常通常是CPU在执行指令时检测到的某些错误，比如除0、访问无效页面等。</p>
-<h3 id="与中断的区别"><a href="#与中断的区别" class="headerlink" title="与中断的区别"></a>与中断的区别</h3><ul>
-<li>中断来自于外部设备，是中断源（例如键盘）发起的，CPU是被动的。</li>
-<li>异常来自于CPU本身，是CPU主动产生的。</li>
-<li>INT N虽然被称为“软件中断”，但其本质是<strong>异常</strong>。因此<strong>不受EFLAG的IF位影响</strong>。</li>
-</ul>
-<h3 id="异常处理"><a href="#异常处理" class="headerlink" title="异常处理"></a>异常处理</h3><p>无论是由硬件设备触发的<strong>中断请求</strong>还是由CPU产生的<strong>异常</strong>，<strong>处理程序都在IDT表</strong>。</p>
-<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-10-09-0f02282d6ae420ce56eb80f212bb696b-idt-87b515.png"></p>
-<p>上图为IDT表中常见的中断向量号的相关描述，具体细节可以参考Intel白皮书第三卷（Exception And Interrupt Reference）这章</p>
-<h3 id="缺页异常（无时无刻不在发生）"><a href="#缺页异常（无时无刻不在发生）" class="headerlink" title="缺页异常（无时无刻不在发生）"></a>缺页异常（无时无刻不在发生）</h3><p>缺页异常产生：</p>
-<ul>
-<li>当PDE&#x2F;PTE的P&#x3D;0时</li>
-<li>当PDE&#x2F;PTE的属性为只读，但程序试图写入时</li>
-</ul>
-<p>一旦发生缺页异常，CPU会执行IDT表中的0xE号中断处理程序，由操作系统接管。</p>
-<p>这里简单概括上述两种发生缺页异常的情况：</p>
-<ol>
-<li>在操作系统中，物理页往往是紧缺的，若当前PTE指向的物理页的内容一段时间没有被访问，则会将这个物理页上的内容存到一个文件里，同时将这个物理页挂给有需要的PTE用，并将原PTE的P位置0。当程序再次访问这段内容时，发现P位为0，则会触发缺页异常，但是此时PTE下标为10,11的位置均为0，其余位置都是有值的，这种情况说明当前PTE指向的内容存到了文件中，并根据下标1~4指定的偏移，在文件中找到内容。这时再重新给这些内容挂上新的物理页，将P位改为1，这时访问便可正常执行。当然，缺页异常对于用户来说是透明的，用户只会觉得自己正常访问了某个内容，但实际上进行了很多操作，通过缺页异常，操作系统可以节省大量物理页。 <img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-10-28-30cb6365ba122cd996320de91d9fb256-defaultPage-a6ea39.png">])</li>
-<li>当PDE&#x2F;PTE属性为只读时，CPU不会进行处理，而是跳到E号中断交给操作系统来处理，操作系统发现程序正在尝试写一个只读的物理页，会返回一个C0000005错误。</li>
-</ol>
-<h3 id="异常小节"><a href="#异常小节" class="headerlink" title="异常小节"></a>异常小节</h3><p>当异常发生时，CPU会判断异常的种类，根据中断向量号，跳转到相应的异常处理程序，接着由操作系统接管并处理。</p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这篇简要介绍了中断与异常，在后续讲到中断章节时，会更加详细的分析过程原理。</p>
-]]></content>
-      <categories>
-        <category>Windows内核</category>
-      </categories>
-      <tags>
-        <tag>保护模式</tag>
-        <tag>x86</tag>
-        <tag>Windows内核</tag>
       </tags>
   </entry>
   <entry>
     <title>TLB&amp;控制寄存器</title>
-    <url>/2022/03/23/TLB&amp;%E6%8E%A7%E5%88%B6%E5%AF%84%E5%AD%98%E5%99%A8/</url>
+    <url>/2022/03/23/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/TLB&amp;%E6%8E%A7%E5%88%B6%E5%AF%84%E5%AD%98%E5%99%A8/</url>
     <content><![CDATA[<h2 id="TLB"><a href="#TLB" class="headerlink" title="TLB"></a>TLB</h2><h3 id="设计原因"><a href="#设计原因" class="headerlink" title="设计原因"></a>设计原因</h3><ol>
 <li>假设我们通过一个线性地址访问一个物理页，想要去读取物理页上某个字节。但是实际过程中，并非只读了1个字节，我们需要先读取PDE，再读取PTE，最后再读取存放1个字节的物理页，读取的内容远远超过1个字节了。</li>
 <li>在2-9-9-12分页下，会多读24个字节，如果读取的内容跨页了（存在两个不同的物理页上），那多读的字节会更多</li>
@@ -779,9 +444,407 @@
         <category>Windows内核</category>
       </categories>
       <tags>
-        <tag>保护模式</tag>
         <tag>x86</tag>
         <tag>Windows内核</tag>
+        <tag>保护模式</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>中断与异常</title>
+    <url>/2022/03/24/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/</url>
+    <content><![CDATA[<h2 id="中断"><a href="#中断" class="headerlink" title="中断"></a>中断</h2><h3 id="什么是中断"><a href="#什么是中断" class="headerlink" title="什么是中断"></a>什么是中断</h3><ol>
+<li>中断通常是由CPU外部的输入输出设别（<strong>硬件</strong>）所触发的，供外部设备通知CPU“有事情需要处理”，因此又叫做中断请求（<strong>IRQ-Interrupt Request</strong>）</li>
+<li>中断请求的目的是希望CPU暂时停止执行当前<strong>正在执行</strong>的程序，转去执行中断请求所对应的中断处理例程（<strong>中断处理程序在哪由IDT表决定</strong>）</li>
+<li>80x86有两条中断请求线：<ul>
+<li>不可屏蔽中断线，称为<strong>NMI（NonMaskable Interrupt）</strong></li>
+<li>可屏蔽中断线，称为<strong>INTR（Interrupt Require）</strong></li>
+</ul>
+</li>
+</ol>
+<h3 id="不可屏蔽中断"><a href="#不可屏蔽中断" class="headerlink" title="不可屏蔽中断"></a>不可屏蔽中断</h3><table>
+<thead>
+<tr>
+<th>（IDT表）中断号</th>
+<th>NMI</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0x2</td>
+<td>不可屏蔽中断</td>
+<td>80x86中固定为0x2</td>
+</tr>
+</tbody></table>
+<p>说明：</p>
+<ul>
+<li>当不可屏蔽中断产生时，CPU在执行完当前指令后会立即进入2号中断，执行相应中断处理程序</li>
+<li>不可屏蔽中断不受EFLAG寄存器中IF位的影响，一旦发生，CPU必须处理</li>
+</ul>
+<h3 id="可屏蔽中断"><a href="#可屏蔽中断" class="headerlink" title="可屏蔽中断"></a>可屏蔽中断</h3><p>在硬件级，可屏蔽中断是由一块专门的芯片来管理的，通常称为<strong>中断控制器</strong>。它负责分配中断资源和管理各个中断源发出的中断请求。为了便于标识各个中断请求，中断控制器通常用<strong>IRQ（Interrupt Request）</strong>后面加上数字来表示不同的中断。</p>
+<p>例如：在Windows中，时钟中断的IRQ编号为0，也就是：IRQ0</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-09-44-12c11df6822da09bd28c093a1bcf7e9d-time-785f23.png"></p>
+<table>
+<thead>
+<tr>
+<th>（IDT表）中断号</th>
+<th>IRQ</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0x30</td>
+<td>IRQ0</td>
+<td>时钟中断</td>
+</tr>
+<tr>
+<td>0x31~0x3F</td>
+<td>IRQ1~IRQ15</td>
+<td>其它硬件设备的中断</td>
+</tr>
+</tbody></table>
+<p>说明：</p>
+<ul>
+<li>如果自己的程序执行时不希望CPU去处理这些中断，可以用<strong>CLI</strong>指令清空EFLAG寄存器中的IF位。与CLI指令相反，<strong>STI</strong>指令可以用来设置EFLAG寄存器中的IF位</li>
+<li>硬件中断与IDT表中的对应关系并且固定不变的，参见<strong>APIC</strong>（高级可编程中断控制器）</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-09-52-aab31730dd09f458c47fcdca4df3fd67-APIC-1df766.png"></p>
+<h2 id="异常"><a href="#异常" class="headerlink" title="异常"></a>异常</h2><p>聊完了中断，来看看异常。异常通常是CPU在执行指令时检测到的某些错误，比如除0、访问无效页面等。</p>
+<h3 id="与中断的区别"><a href="#与中断的区别" class="headerlink" title="与中断的区别"></a>与中断的区别</h3><ul>
+<li>中断来自于外部设备，是中断源（例如键盘）发起的，CPU是被动的。</li>
+<li>异常来自于CPU本身，是CPU主动产生的。</li>
+<li>INT N虽然被称为“软件中断”，但其本质是<strong>异常</strong>。因此<strong>不受EFLAG的IF位影响</strong>。</li>
+</ul>
+<h3 id="异常处理"><a href="#异常处理" class="headerlink" title="异常处理"></a>异常处理</h3><p>无论是由硬件设备触发的<strong>中断请求</strong>还是由CPU产生的<strong>异常</strong>，<strong>处理程序都在IDT表</strong>。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-10-09-0f02282d6ae420ce56eb80f212bb696b-idt-87b515.png"></p>
+<p>上图为IDT表中常见的中断向量号的相关描述，具体细节可以参考Intel白皮书第三卷（Exception And Interrupt Reference）这章</p>
+<h3 id="缺页异常（无时无刻不在发生）"><a href="#缺页异常（无时无刻不在发生）" class="headerlink" title="缺页异常（无时无刻不在发生）"></a>缺页异常（无时无刻不在发生）</h3><p>缺页异常产生：</p>
+<ul>
+<li>当PDE&#x2F;PTE的P&#x3D;0时</li>
+<li>当PDE&#x2F;PTE的属性为只读，但程序试图写入时</li>
+</ul>
+<p>一旦发生缺页异常，CPU会执行IDT表中的0xE号中断处理程序，由操作系统接管。</p>
+<p>这里简单概括上述两种发生缺页异常的情况：</p>
+<ol>
+<li>在操作系统中，物理页往往是紧缺的，若当前PTE指向的物理页的内容一段时间没有被访问，则会将这个物理页上的内容存到一个文件里，同时将这个物理页挂给有需要的PTE用，并将原PTE的P位置0。当程序再次访问这段内容时，发现P位为0，则会触发缺页异常，但是此时PTE下标为10,11的位置均为0，其余位置都是有值的，这种情况说明当前PTE指向的内容存到了文件中，并根据下标1~4指定的偏移，在文件中找到内容。这时再重新给这些内容挂上新的物理页，将P位改为1，这时访问便可正常执行。当然，缺页异常对于用户来说是透明的，用户只会觉得自己正常访问了某个内容，但实际上进行了很多操作，通过缺页异常，操作系统可以节省大量物理页。 <img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-10-28-30cb6365ba122cd996320de91d9fb256-defaultPage-a6ea39.png">])</li>
+<li>当PDE&#x2F;PTE属性为只读时，CPU不会进行处理，而是跳到E号中断交给操作系统来处理，操作系统发现程序正在尝试写一个只读的物理页，会返回一个C0000005错误。</li>
+</ol>
+<h3 id="异常小节"><a href="#异常小节" class="headerlink" title="异常小节"></a>异常小节</h3><p>当异常发生时，CPU会判断异常的种类，根据中断向量号，跳转到相应的异常处理程序，接着由操作系统接管并处理。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这篇简要介绍了中断与异常，在后续讲到中断章节时，会更加详细的分析过程原理。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>保护模式</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>任务段</title>
+    <url>/2022/03/16/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E4%BB%BB%E5%8A%A1%E6%AE%B5/</url>
+    <content><![CDATA[<blockquote>
+<p>在调用门、中断门与陷阱门中，一旦发生权限切换，那么就必有堆栈的切换。而且，由于CS的CPL发生改变，也导致了SS也必须要切换。</p>
+<p>那么问题来了，我们知道EIP和CS的值都可以通过门描述符获得，那么ESP和SS是哪来的？</p>
+<p>这就是引出了今天的内容：<strong>TSS</strong>（Task-state segment），任务状态段。</p>
+</blockquote>
+<h2 id="TSS设计初衷"><a href="#TSS设计初衷" class="headerlink" title="TSS设计初衷"></a>TSS设计初衷</h2><p>想要学习一类知识，首先要了解它被设计出来的目的，这样就能找到方向，更好的了解它。CPU在运行时会频繁的切换任务，每次切换任务时，还没执行完的任务怎么办？总不能下次重新执行吧，于是需要保存上一个任务的上下文环境，于是，TSS诞生了，<strong>TSS是一块大小为104(0x68)个字节的内存</strong>，没错，<strong>TSS</strong>不是什么寄存器，<strong>就是一段内存，或者说是一个段</strong>，这段内存可以保存32-Bit下所有通用寄存器以及段寄存器的值，这样CPU就可以切换到新任务时，仍然保留上一个任务的环境，方便新任务执行完后，能够完好的回到先前的任务继续执行。</p>
+<p>注意，TSS是一个段，有段就有段寄存器和段描述符哟！比如我们熟悉的CS，CS就是<strong>段寄存器</strong>，它描述的是<strong>代码段</strong>，同时，它会通过段选择子从GDT表的<strong>代码段描述符</strong>中载入段的相关信息，通常情况下，代码段的范围是0~FFFFFFFF（大小是4GB）；这样一对比，就可以理解了，TSS也是如此，因为TSS也是一个段（大小是104字节），所以应该存在一个描述TSS的段寄存器从一个段描述符里加载TSS相关信息。这就是今天会依次介绍的TR寄存器和TSS段描述符。</p>
+<p>这里补充一点知识，尽管Intel设计TSS的初衷的为了方便任务切换（<strong>CPU层面叫做任务切换，操作系统层面叫做线程切换</strong>），但是Windows认为这个TSS设计的不好，因此并没有采用这个结构进行线程切换，并且Linux也没有采用TSS进行线程切换，这俩操作系统用的都是堆栈进行线程切换的。那么Windows用到了这个结构没有，当然是用到了，但仅仅用到了ESP0和SS0这两个值。</p>
+<h2 id="TSS结构"><a href="#TSS结构" class="headerlink" title="TSS结构"></a>TSS结构</h2><p>先来看看TSS的结构</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tss.png" alt="img"></p>
+<p>大部分都应该比较熟悉，这里介绍几个较为陌生的字段：</p>
+<ul>
+<li>Previous Task Link：这里保存的是<strong>上一个TSS的段选择子</strong>，比如任务发生了切换，新任务执行完后，如何才能找到先前未能执行完的任务呢？就得依靠这个值了（前面不是说了Windows不用TSS进行线程切换嘛，是呀，但是这里讲解的这个字段的作用，设计初衷就是为了任务切换）</li>
+<li>ESP0&#x2F;SS0：当发生提权时，0环的ESP和SS的值就是从这里取的</li>
+<li>CR3：有人会问，我哪知道取哪个TSS的ESP0和SS0呢？就是这个值的作用了，这个值帮我们<strong>确定当前位于哪个线程</strong>，之后在页的篇章中会学到CR3的相关内容。</li>
+<li>LDT：这个值通常都是0，Windows没有用到LDT表，因为<strong>LDT表只对当前的线程有用</strong></li>
+<li>I&#x2F;O Map：这个位置涉及到硬件IO了，值一般是固定的</li>
+</ul>
+<h2 id="TSS段描述符"><a href="#TSS段描述符" class="headerlink" title="TSS段描述符"></a>TSS段描述符</h2><p>[<img src="https://cataloc.gitee.io/blog/2020/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/tssDesc.png" alt="](https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tssDesc.png)"></p>
+<p>TSS段描述符只能存在GDT表中，不能存到LDT或者IDT中，所以它的结构和之前介绍的段描述符是类似的，区别在于个别位的不同</p>
+<ul>
+<li>G位：在代码段&#x2F;数据段描述符中，这个位置通常位1，因为这两个段的范围通常是4GB，而TSS的大小是104字节，单位是字节，因此这个值为0</li>
+<li>Type域：这个值为1011或1001，其中B位是Busy位，置1时说明该TSS是否被载入或者嵌套，载入说明CPU正在执行该任务；嵌套则表明该任务处理了一半，切换到了另一个任务中去，但该任务并未执行完。</li>
+<li>Base&#x2F;Limit：Base确定TSS段的起始位置，Limit确定TSS段的大小，Base~Base+Limit就是TSS段的范围。</li>
+</ul>
+<h2 id="TR寄存器"><a href="#TR寄存器" class="headerlink" title="TR寄存器"></a>TR寄存器</h2><p>CPU共有8个段寄存器，TR就是其中之一。</p>
+<p>TR寄存器的工作原理和其它段寄存器一样，通过段选择子加载GDT表的TSS段描述符中的信息，<strong>方便CPU找到TSS的位置</strong>，具体工作原理如下：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tr.png" alt="(https://cataloc.gitee.io/blog/2020/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/tr.png)"></p>
+<p>这里介绍两个操作TR段寄存器的指令LTR和STR：</p>
+<ul>
+<li>LTR：这是一个特权指令，只有0环的程序才能调用；作用是将段选择子写入TR寄存器</li>
+<li>STR：STR不是特权指令，这个指令3环程序也可以调用，所用是读取TR寄存器的值</li>
+</ul>
+<p>需要注意的一点，修改TR寄存器的值，只是会载入新的TSS段描述符信息，并不会对修改前的TSS段造成影响。</p>
+<h2 id="实现任务切换"><a href="#实现任务切换" class="headerlink" title="实现任务切换"></a>实现任务切换</h2><p>虽然说了Windows并没有将TSS用来进行线程切换，但是我们仍然可以手动实现任务的切换。</p>
+<p>直接修改TR寄存器是不能做到任务切换的，但是可以通过JMP FAR或者CALL FAR来加载TSS段描述符来实现。下面分别使用两种方法来实现（两种实现方法细节有很多差别）</p>
+<p>一般情况下，<strong>任务切换发生在下列四种情况</strong>之一：</p>
+<ul>
+<li>当前程序，任务或者进程执行JMP&#x2F;CALL语句，且参数是位于GDT表中的TSS段描述符</li>
+<li>当前程序，任务或者进程执行JMP&#x2F;CALL语句，且参数是位于GDT表或者当前LDT表中的任务门描述符</li>
+<li>一个中断或者异常触发了在IDT表中的任务门描述符</li>
+<li>当前任务执行IRET指令，且EFLAGS寄存器的NT位为1时</li>
+</ul>
+<h3 id="CALL-FAR实现"><a href="#CALL-FAR实现" class="headerlink" title="CALL FAR实现"></a>CALL FAR实现</h3><p>本次CALL FAR实现采用第一种任务切换的情况。</p>
+<p>设计一个TSS，存储任务切换时必要的信息，其中包括ESP0，SS0，CR3，EIP，ESP，段寄存器，位图控制。</p>
+<ul>
+<li>ESP0：也就是任务切换后的堆栈，可以自己创一个空数组，然后写入数组的首地址，就可以作为堆栈使用。</li>
+<li>段寄存器及SS0：这些值，在0环通常都一样，可以进入Windbg参考其它TSS的值，这里使用的是SS&#x2F;SS0 &#x3D; 0x10，ES&#x2F;DS &#x3D; 0x23，CS &#x3D; 0x8，FS &#x3D; 0x30，GS &#x3D; 0x0</li>
+<li>EIP：这就是要跳转后执行的地方，可以写一个裸函数来验证是否切换成功，直接取裸函数地址即可，我这里的值为0x401020（每个人机器可能不一样）</li>
+<li>CR3：这个值，需要在执行前，中断到Windbg寄存器中，通过!process 0 0指令获取。</li>
+<li>位图控制：这是一个默认值为0x20AC0000</li>
+</ul>
+<p>构造完的TSS如下：</p>
+<p>C</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">DWORD tss[0x68] = &#123;</span><br><span class="line">		0x00000000,	//Previous Task Link</span><br><span class="line">		(DWORD)stack,	//ESP0</span><br><span class="line">		0x00000010,	//SS0</span><br><span class="line">		0x00000000, //ESP1</span><br><span class="line">		0x00000000, //SS1</span><br><span class="line">		0x00000000, //ESP2</span><br><span class="line">		0x00000000, //SS2</span><br><span class="line">		(DWORD)Cr3,	//Cr3</span><br><span class="line">		0x00401020,	//EIP</span><br><span class="line">		0x00000000,	//EFLAGS</span><br><span class="line">		0x00000000,	//EAX</span><br><span class="line">		0x00000000,	//ECX</span><br><span class="line">		0x00000000,	//EDX</span><br><span class="line">		0x00000000,	//EBX</span><br><span class="line">		(DWORD)stack,	//ESP</span><br><span class="line">		0x00000000,	//EBP</span><br><span class="line">		0x00000000,	//ESI</span><br><span class="line">		0x00000000,	//EDI</span><br><span class="line">		0x00000023,	//ES</span><br><span class="line">		0x00000008, //CS</span><br><span class="line">		0x00000010,	//SS</span><br><span class="line">		0x00000023,	//DS</span><br><span class="line">		0x00000030,	//FS</span><br><span class="line">		0x00000000,	//GS</span><br><span class="line">		0x00000000,	//LDT</span><br><span class="line">		0x20ac0000	//IO_MAP</span><br><span class="line">	&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>然后我们需要根据这个TSS的地址，来构造我们的TSS段描述符</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tssAddr.png" alt="(https://cataloc.gitee.io/blog/2020/03/16/%E4%BB%BB%E5%8A%A1%E6%AE%B5/tssAddr.png)"></p>
+<p>地址为0x12fd70</p>
+<p>因此TSS段描述符为：0000e912&#96;fd700068，e-&gt;DPL&#x3D;3：是为了3环的程序可以访问这个段描述符，0x68就是104字节，9说明未被载入。然后让我们填入段描述符</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/segDesc.png"></p>
+<p>接着运行程序，需要采集Cr3的值，先中断到Windbg，再通过!process 0 0指令获取，取最后的一个值</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/cr3.png"></p>
+<p>在程序中填入cr3的值后回车，发现可以成功取到任务切换后ESP，CS，SS，并且均为我们设定的值，实验成功。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/callFar.png"></p>
+<p>完整代码如下：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stdafx.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> </span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> saveEax, newESP;</span><br><span class="line"><span class="type">short</span> newCS, newSS;</span><br><span class="line"></span><br><span class="line">__declspec(naked) <span class="function"><span class="type">void</span> <span class="title">Get_Value</span><span class="params">()</span> </span>&#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		mov saveEax, eax</span><br><span class="line">		mov newESP, esp</span><br><span class="line">		mov ax, cs</span><br><span class="line">		mov newCS, ax</span><br><span class="line">		mov ax, ss</span><br><span class="line">		mov newSS, ax</span><br><span class="line">		mov eax, saveEax</span><br><span class="line">		iret</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="type">char</span> stack[<span class="number">100</span>] = &#123;<span class="number">0</span>&#125;;</span><br><span class="line">	<span class="type">char</span> buffer[<span class="number">6</span>] = &#123;<span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x4B</span>, <span class="number">0x0</span>&#125;;</span><br><span class="line">	<span class="type">int</span> Cr3 = <span class="number">0</span>;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;Input: &quot;</span>);</span><br><span class="line">	<span class="built_in">scanf</span>(<span class="string">&quot;%x&quot;</span>, &amp;Cr3);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line"></span><br><span class="line">	DWORD tss[<span class="number">0x68</span>] = &#123;</span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//Previous Task Link</span></span><br><span class="line">		(DWORD)stack,	<span class="comment">//ESP0</span></span><br><span class="line">		<span class="number">0x00000010</span>,	<span class="comment">//SS0</span></span><br><span class="line">		<span class="number">0x00000000</span>, <span class="comment">//ESP1</span></span><br><span class="line">		<span class="number">0x00000000</span>, <span class="comment">//SS1</span></span><br><span class="line">		<span class="number">0x00000000</span>, <span class="comment">//ESP2</span></span><br><span class="line">		<span class="number">0x00000000</span>, <span class="comment">//SS2</span></span><br><span class="line">		(DWORD)Cr3,	<span class="comment">//Cr3</span></span><br><span class="line">		<span class="number">0x00401020</span>,	<span class="comment">//EIP</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EFLAGS</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EAX</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//ECX</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EDX</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EBX</span></span><br><span class="line">		(DWORD)stack,	<span class="comment">//ESP</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EBP</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//ESI</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//EDI</span></span><br><span class="line">		<span class="number">0x00000023</span>,	<span class="comment">//ES</span></span><br><span class="line">		<span class="number">0x00000008</span>, <span class="comment">//CS</span></span><br><span class="line">		<span class="number">0x00000010</span>,	<span class="comment">//SS</span></span><br><span class="line">		<span class="number">0x00000023</span>,	<span class="comment">//DS</span></span><br><span class="line">		<span class="number">0x00000030</span>,	<span class="comment">//FS</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//GS</span></span><br><span class="line">		<span class="number">0x00000000</span>,	<span class="comment">//LDT</span></span><br><span class="line">		<span class="number">0x20ac0000</span>	<span class="comment">//IO_MAP</span></span><br><span class="line">	&#125;;</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;ESP: %x, cs: %x, ss: %x&quot;</span>, newESP, newCS, newSS);</span><br><span class="line">	<span class="built_in">getchar</span>();</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="JMP-FAR实现"><a href="#JMP-FAR实现" class="headerlink" title="JMP FAR实现"></a>JMP FAR实现</h3><p>还有另一种方法，是通过JMP FAR来实现，而且JMP FAR实现会更加困难一些。这里简要概括一下，当使用CALL FAR时，CPU会自动帮你用当前任务的段选择子填写你TSS的Previous Task Link字段，同时给你的Eflags的NT位置1，这个NT位有什么用呢，就是关系到iret这个指令的意义，当Elfags的NT为1时，iret表示根据Previous Task Link的值，从当前任务返回到前一个任务中去，当NT为0时，这是一个中断返回指令。而当你使用JMP FAR实现时，你需要手动给Pervious Task Link字段赋上前一个任务的段选择子，此外你需要手动给Eflags的NT位置1，当然这可以通过</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">pushfd</span><br><span class="line">mov eax, [esp]</span><br><span class="line">or eax, 0x4000</span><br><span class="line">mov [esp], eax</span><br><span class="line">popfd</span><br></pre></td></tr></table></figure>
+
+<p>来实现，此外，还需要确保前一个TSS段的段描述符Busy位的值为1，这样才能确保该任务处在嵌入的状态。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>保护模式</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>任务门</title>
+    <url>/2022/03/17/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E4%BB%BB%E5%8A%A1%E9%97%A8/</url>
+    <content><![CDATA[<h2 id="为何使用任务门"><a href="#为何使用任务门" class="headerlink" title="为何使用任务门"></a>为何使用任务门</h2><p>之前任务段中提到，进行任何切换时可以还可以使用任务门。那么既然存在TSS段描述符了，为何还需要任务门呢？</p>
+<p>简要概括，任务门有如下优势：</p>
+<ul>
+<li>任务门可以放在GDT表中，也可以放在IDT表中，还能放在当前线程的LDT表中，而TSS段描述符只能在GDT表中</li>
+<li>任务门可以让低权限的线程进行任何切换，任务门的结构中也有DPL属性，当通过任务门去访问TSS描述符时，一旦通过任务门，TSS段描述符就不再进行检查了，即使你是个CPL&#x3D;3的程序，而TSS段描述符的DPL&#x3D;0，只要任务门DPL&#x3D;3，就可以通过任务门完成任务切换，稍后会做这个实验。</li>
+<li>由于任务门可以位于IDT表中，所以当遇到中断或者异常时，可以切换到独立的任务去处理异常</li>
+</ul>
+<p>下面为不同表中，任务门进行任务切换的过程：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/table.png"></p>
+<h2 id="任务门描述符"><a href="#任务门描述符" class="headerlink" title="任务门描述符"></a>任务门描述符</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/taskGate.png"></p>
+<p>任务门描述符的结构非常简单，真正用到的只有24位，属性位里：DPL一般设置为3，方便应用程序访问，Type则是固定的0101，TSS段选择子，顾名思义，就是一个段选择子，指向位于GDT表中TSS段描述符的位置。其余位均为保留位，置0即可。</p>
+<h2 id="任务门实现任务切换"><a href="#任务门实现任务切换" class="headerlink" title="任务门实现任务切换"></a>任务门实现任务切换</h2><p>这一步十分简单，仅仅比使用TSS多了一个步骤而已，这里也不细讲了，直接上步骤。</p>
+<p>首先，编译源文件，下断点，确定TSS的地址，根据地址构造TSS段描述符：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structDesc.png"></p>
+<p>第二步，根据GDT表中构造好的TSS段描述符位置，在IDT表中构造任务门：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/structSelect.png"></p>
+<p>第三步，在Windbg中使用!process 0 0指令确定CR3的值，并填入自己的TSS中：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/dirbase.png"></p>
+<p>执行程序，获取到自己构造的TSS表数据，任务切换成功：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/result.png"></p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>保护模式</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>基址小实验（10-10-12）</title>
+    <url>/2022/03/20/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/</url>
+    <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过<code>0xC0300000</code>和<code>0xC0000000</code>这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
+<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://happy1wawayu.github.io/2022/03/19/PDE_PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
+<h2 id="测试原始代码"><a href="#测试原始代码" class="headerlink" title="测试原始代码"></a>测试原始代码</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-06-946691fd700d1b1c1e8d4d29276e8289-before-414890.png"></p>
+<p>首先测试原始代码，发现直接修改常量区的字符串，是会失败的</p>
+<h2 id="提权进入0环"><a href="#提权进入0环" class="headerlink" title="提权进入0环"></a>提权进入0环</h2><p>提权这里还是会用到Windbg，根据调用函数的地址，填入段选择子，并通过调用门进行提权（就当复习调用门知识了）</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-13-54-05021cd34209ff0f52323592744b5199-addr-5603f1.png"> </p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-35-144d87388db62a38ec244f39dcc05dbc-windbg-c764d6.png"></p>
+<h2 id="修改R-x2F-W位"><a href="#修改R-x2F-W位" class="headerlink" title="修改R&#x2F;W位"></a>修改R&#x2F;W位</h2><p>提权进入0环后（为啥要提权呢？因为C0300000&#x2F;C0000000都属于高2G的线性地址，3环没法直接访问），就到了我们最关键的步骤了，修改R&#x2F;W位。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">temp = *(int*)0xC0300004;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC0300004 = temp;</span><br><span class="line">temp = *(int*)0xC000108C;</span><br><span class="line">temp = temp|0x2;</span><br><span class="line">*(int*)0xC000108C = temp;</span><br></pre></td></tr></table></figure>
+
+<p>在这之前声明了一个中间变量temp（int类型）。</p>
+<p>具体步骤：</p>
+<ol>
+<li>打印出字符串所在常量区的地址0x423fb0，进行拆分：10-10-12 -&gt; 0x1-0x23-0xfb0</li>
+<li>PDI &#x3D; 0x1，带入公式：PDE &#x3D; C0300000 + 0x1 x 4</li>
+<li>PTI &#x3D; 0x23，带入公式：PTE &#x3D; C0000000 + 0x1 x 1000 + 0x23 x 4</li>
+<li>分别取PDE和PTE处的值，并<strong>和0x2进行或运算（将R&#x2F;W位置1）</strong></li>
+</ol>
+<p>这样就完成了对R&#x2F;W位的修改，在接下来再次对常量区的值进行修改操作时，便可以成功。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-46-50-05a67d4539354f9f4778a64126020e49-after-7736fd.png"></p>
+<h2 id="完整代码"><a href="#完整代码" class="headerlink" title="完整代码"></a>完整代码</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line"></span><br><span class="line">int temp;</span><br><span class="line"></span><br><span class="line">__declspec(naked) void ModifyRW() &#123;</span><br><span class="line">	__asm &#123;</span><br><span class="line">		pushad</span><br><span class="line">		pushfd</span><br><span class="line">	&#125;</span><br><span class="line">	temp = *(int*)0xC0300004;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC0300004 = temp;</span><br><span class="line">	temp = *(int*)0xC000108C;</span><br><span class="line">	temp = temp|0x2;</span><br><span class="line">	*(int*)0xC000108C = temp;</span><br><span class="line">	</span><br><span class="line">	__asm &#123;</span><br><span class="line">		popfd</span><br><span class="line">		popad</span><br><span class="line">		retf</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char* str = &quot;hello&quot;; </span><br><span class="line">	char buffer[6] = &#123;0, 0, 0, 0, 0x4B, 0&#125;;</span><br><span class="line">	printf(&quot;addr: %x, str: %s&quot;, str, str);</span><br><span class="line">	getchar();</span><br><span class="line"></span><br><span class="line">	_asm &#123;</span><br><span class="line">		call fword ptr buffer</span><br><span class="line">	&#125;</span><br><span class="line">	*str = &#x27;a&#x27;;</span><br><span class="line">	printf(&quot;str: %s&quot;, str);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>保护模式</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>逆向分析MmIsAddressValid（10-10-12）</title>
+    <url>/2022/03/21/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/</url>
+    <content><![CDATA[<p>在对页表基址，页目录表基址熟练掌握后，今天来看逆向分析一个函数：MmIsAddressValid。这是一个系统函数，可以在ntoskrnl.exe的导出函数中找到它，也可以在Windbg中输入指令</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">kd&gt; u MmIsAddressValid</span><br></pre></td></tr></table></figure>
+
+<p>查看。</p>
+<p>为什么要分析这个函数呢？因为即使是系统函数，也是无法直接使用物理页的，想要去访问PDE和PTE也就一定要通过基址来访问，而今天要分析的MmIsAddressValid函数，就利用了这么一个原理，相比前一篇的基址小实验，这里对于线性地址拆分的过程更为巧妙，让我们一起来看看吧！</p>
+<h2 id="获取PDE属性"><a href="#获取PDE属性" class="headerlink" title="获取PDE属性"></a>获取PDE属性</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-12-04-35-dad27cbe16aabf5c4d005018b697acc7-original-ac218c.png"></p>
+<p>首先观察函数主体部分，发现代码并不长，但是有很多跳转，具体跳转内容就不作分析了，主要是分析函数主体：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4661 8bff            mov     edi,edi		//hotpatch</span><br><span class="line">804e4663 55              push    ebp</span><br><span class="line">804e4664 8bec            mov     ebp,esp</span><br><span class="line">804e4666 8b4d08          mov     ecx,dword ptr [ebp+8]	//取第一个参数（线性地址）</span><br><span class="line">804e4669 8bc1            mov     eax,ecx		//赋值到中间变量，方便运算</span><br><span class="line">804e466b c1e814          shr     eax,14h		//逻辑右移20位</span><br><span class="line">804e466e bafc0f0000      mov     edx,0FFCh				</span><br><span class="line">804e4673 23c2            and     eax,edx		//和操作数进行与运算，同时清空最后2位；相当于做了一个乘4的运算，既左移2位</span><br><span class="line">804e4675 2d0000d03f      sub     eax,3FD00000h		//进行减法运算，相当于eax+0xC0300000</span><br><span class="line">804e467a 8b00            mov     eax,dword ptr [eax]	//取PDE的值</span><br><span class="line">804e467c a801            test    al,1			//判断PDE属性P位是否为1</span><br><span class="line">804e467e 0f84d2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e4684 84c0            test    al,al			//判断下标为7的位(PS位)值是否为1</span><br><span class="line">804e4686 7824            js      nt!MmIsAddressValid+0x53 (804e46ac)</span><br></pre></td></tr></table></figure>
+
+<h3 id="巧妙的与运算："><a href="#巧妙的与运算：" class="headerlink" title="巧妙的与运算："></a>巧妙的与运算：</h3><ol>
+<li>首先将线性地址逻辑右移20位，此时还余下12位</li>
+<li>将这12位和操作数0xFFC做一个与运算，0xFFC换算成2进制就是1111 1111 1100。因此做完与运算后，刚刚经过第一步操作还剩下12位的数的低2位，置0了。熟悉移位运算的朋友们知道，这个12位的数，相当于1个10位的数逻辑左移2位得到，换句话说就是将这个10位的数乘4。而这个10位，就是PDI，因此这步操作完了以后，相当于我们获得了PDI*4的值。</li>
+<li>接下来，与0x3FD00000做减法运算，作用相当于加上0xC0300000，两种方法的结果是一样的。因此，我们得到了0xC0300000 + PDI*4的值，而这个值，恰恰就是我们要找的PDE，接着只需要取出里面的值，就可以获取PDE的属性了</li>
+</ol>
+<h3 id="后续跳转"><a href="#后续跳转" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>再获取PDE的属性后，会遇到两个跳转，简单的概括下：</p>
+<ol>
+<li>首先会判断PDE下标为0的位置的值，也就是P位，当P位为0时，说明物理页无效，会跳转到一个相应的处理函数，这里就不再跟进分析</li>
+<li>若物理页P位为1，就会来到第二个跳转，这里test al, al指令会修改标志寄存器，当al的最高位，也就是下标为7的位置值为1时，会被认为是负数，此时会修改EFLAG寄存器的SF位。这时，在第二个跳转的位置，js判断的就是SF的值是否为1，若为1，也就是al下标为7的位置值为1，这是对应的PDE属性PS位，说明这是一个4MB的大页，进而会跳转执行相应的处理函数。</li>
+</ol>
+<h2 id="获取PTE属性"><a href="#获取PTE属性" class="headerlink" title="获取PTE属性"></a>获取PTE属性</h2><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804e4688 c1e90a          shr     ecx,0Ah		//逻辑右移10位</span><br><span class="line">804e468b 81e1fcff3f00    and     ecx,3FFFFCh		//和操作数进行与运算，同时清空最后2位，相当于PDI左移12位+PTI左移2位</span><br><span class="line">804e4691 81e900000040    sub     ecx,40000000h		//进行减法运算，相当于eax+0xC0000000</span><br><span class="line">804e4697 8bc1            mov     eax,ecx</span><br><span class="line">804e4699 8b08            mov     ecx,dword ptr [eax]	//获取PTE属性</span><br><span class="line">804e469b f6c101          test    cl,1			//判断P位的值是否为0</span><br><span class="line">804e469e 0f84b2f10000    je      nt!MmIsAddressValid+0x4f (804f3856)</span><br><span class="line">804e46a4 84c9            test    cl,cl			//判断PAT是值是否为1</span><br><span class="line">804e46a6 0f88b6de0300    js      nt!MmIsAddressValid+0x3f (80522562)</span><br><span class="line">804e46ac b001            mov     al,1</span><br><span class="line">804e46ae 5d              pop     ebp</span><br><span class="line">804e46af c20400          ret     4</span><br></pre></td></tr></table></figure>
+
+<h3 id="巧妙的与运算"><a href="#巧妙的与运算" class="headerlink" title="巧妙的与运算"></a>巧妙的与运算</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">and ecx, 3FFFFCh</span><br></pre></td></tr></table></figure>
+
+<p>假设线性地址右移10位后的值为 0000 0000 00aa aaaa aaaa bbbb bbbb bbxx（a, b的值为0或者1，这里只是为了区分PDI和PTI）</p>
+<p>然后我们来拆分0x3FFFFC的值：0000 0000 0011 1111 1111 1111 1111 1100</p>
+<p>将两者进行与运算后得到结果为 0000 0000 00aa aaaa aaaa bbbb bbbb bb00</p>
+<p>我们知道，aa aaaa aaaa应为PDI，而bb bbbb bbbb应为PTI，因此可以把得到的结果看作是这样的一个运算：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">aa aaaa aaaa&lt;&lt;12 + bb bbbb bbbb&lt;&lt;2</span><br><span class="line">= aa aaaa aaaa * 2^12 + bb bbbb bbbb * 2^2</span><br><span class="line">= aa aaaa aaaa * 1000h + bb bbbb bbbb * 4h</span><br><span class="line">= PDI*1000h + PTI*4h</span><br></pre></td></tr></table></figure>
+
+<p>因此经过这个与运算后，再通过溢出进行减法运算，获取到PTE的所在位置，便可以取出属性</p>
+<h3 id="后续跳转-1"><a href="#后续跳转-1" class="headerlink" title="后续跳转"></a>后续跳转</h3><p>经过最为关键的步骤，取到了PTE的属性后，还剩下两个跳转，这两个跳转的原理和上述的两个跳转完全一样，分别是取PTE下标为0的P位和下标为7的PAT位，区别仅仅在于，PDE和PTE的下标为7的位的含义不同，所以会跳转进入两个不同的处理函数，这里就不多做分析。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>今天的分析主要是弄清楚Windows系统函数是如何获取物理页属性的，同样是通过利用页目录表基址和页表基址，实现用线性地址访问PDE和PTE，在分析时看到，比较关键的一步是两个与运算，非常巧妙，之后再通过减法运算利用溢出达到和加法运算同样的效果，获取到PDE&#x2F;PTE的值。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>保护模式</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>页目录&amp;页表基址</title>
+    <url>/2022/03/20/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E9%A1%B5%E7%9B%AE%E5%BD%95%E8%A1%A8&amp;%E9%A1%B5%E8%A1%A8%E5%9F%BA%E5%9D%80/</url>
+    <content><![CDATA[<blockquote>
+<p>考虑这样一个问题，我们现在可以通过在Windbg里找到线性地址所在的物理页，通过修改物理页的属性，就可以实现一些原本受限的功能。例如将常量区对应的物理页R&#x2F;W属性修改为1，便可以修改位于常量区的元素。</p>
+<p>但是，以上操作都是基于Windbg在双击调试的环境中实现的，那么一旦脱离了调试器，该如何通过代码来实现对物理页属性的修改呢？这就需要借助于页目录表基址和页表基址了。</p>
+</blockquote>
+<h2 id="页目录表基址"><a href="#页目录表基址" class="headerlink" title="页目录表基址"></a>页目录表基址</h2><p>结论：C0300000就是页目录表基址，接下来我们来验证这个结论。</p>
+<h3 id="C0300000拆分"><a href="#C0300000拆分" class="headerlink" title="C0300000拆分"></a>C0300000拆分</h3><p>C0300000： 1100 0000 0011 0000 0000 0000 0000 0000</p>
+<table>
+<thead>
+<tr>
+<th>每部分位数</th>
+<th>二进制</th>
+<th>十六进制</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10</td>
+<td>11 0000 0000</td>
+<td>300</td>
+</tr>
+<tr>
+<td>10</td>
+<td>11 0000 0000</td>
+<td>300</td>
+</tr>
+<tr>
+<td>12</td>
+<td>0000 0000 0000</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<h3 id="Cr3"><a href="#Cr3" class="headerlink" title="Cr3"></a>Cr3</h3><p>这里以记事本(notepad.exe)为例，来验证一下，C0300000就是页目录表基址，首先查看记事本对应的Cr3指向的物理地址。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-12-35-af0a5d5b7923dd573fb3d855028827d3-pdtCr3-78a409.png" alt="img"></p>
+<p>我们知道，Cr3指向的是PDT的首地址，这里可以看到4个PDE有值。</p>
+<h3 id="查看C0300000物理页"><a href="#查看C0300000物理页" class="headerlink" title="查看C0300000物理页"></a>查看C0300000物理页</h3><p>接下来的步骤就是比较熟悉的，根据拆分后的线性地址，寻找物理页的过程了。但是这一次，要慢点看。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-12-52-9cbeb02851de3f150542cb2966906361-pdtPde-3ea291.png" alt="img"></p>
+<p>这一步很容易理解，Cr3.base + 300*4，通过Cr3和线性地址的前10位，我们找到了PDE的值：7ea49063</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-03-9cbeb02851de3f150542cb2966906361-pdtPde-c1e116.png" alt="img"></p>
+<p>什么？又重复了一遍？实际上不是，由于PDE的值为7ea49063，后12位是属性位，因此，7ea49000是我们要找的PTT的首地址，然后通过PTT.base + 300*4，就得到了PTE的值：7ea49063。</p>
+<p>有了PTE的值，加上最后12位的偏移（此处为0），就可以找到物理页。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-21-a14aa5e484cdf9c52446f449fe68b380-pdtPte-9bc48f.png" alt="img"></p>
+<p>得到结果后，是不是很惊讶？C0300000这个<strong>线性地址对应的物理页上的物理地址</strong>，竟然和Cr3指向的物理地址完全一样！也就是说，以后不需要Cr3，只需在当前程序内，通过C0300000这个线性地址就可以得到当前程序PDT的首地址了</p>
+<h3 id="如何利用"><a href="#如何利用" class="headerlink" title="如何利用"></a>如何利用</h3><p>是啊，C0300000这个地址有啥用呢？当然有用，而且非常有用。回到文章开头的问题，我们该如何在不使用Windbg的情况下，修改物理页的属性呢？</p>
+<p>我们知道，想要修改物理页的属性，需要先修改物理页对应的PDE和PTE，那要如何找到PDE和PTE呢，由于<strong>在编写代码时，用到的都是线性地址</strong>，而C0300000这个线性地址刚好就可以找到PDT的首地址，这样我们拆分想要修改的物理页属性的线性地址，将前10位加上C0300000即可找到对应的PDE。</p>
+<p>既然PDE找到了，那不就有了PTT的首地址，这样PTE不也就可以找到了吗？并不是这样，尽管找到了PDE，但是由于<strong>PDE里面存着的是物理地址，如果直接访问PDE里面存的那个地址，在代码中会转变为一个线性地址</strong>，因此并不能通过PDE获取PTT的首地址，也就不能获取到PTE了，想要找到PTE，还得需要用到另外一个基地址，就是页表基址。</p>
+<h2 id="页表基址"><a href="#页表基址" class="headerlink" title="页表基址"></a>页表基址</h2><p>还是直接上结论，页表基址：C0000000</p>
+<p>接下来我们来验证。</p>
+<h3 id="C0000000拆分"><a href="#C0000000拆分" class="headerlink" title="C0000000拆分"></a>C0000000拆分</h3><p>C0000000： 1100 0000 0000 0000 0000 0000 0000 0000</p>
+<table>
+<thead>
+<tr>
+<th>每部分位数</th>
+<th>二进制</th>
+<th>十六进制</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>10</td>
+<td>11 0000 0000</td>
+<td>300</td>
+</tr>
+<tr>
+<td>10</td>
+<td>00 0000 0000</td>
+<td>0</td>
+</tr>
+<tr>
+<td>12</td>
+<td>0000 0000 0000</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<h3 id="Cr3-1"><a href="#Cr3-1" class="headerlink" title="Cr3"></a>Cr3</h3><p>这里还是以记事本(notepad.exe)为例：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-43-93925f55bcc80aeec601d2b6fb776733-pttCr3-a7d53d.png" alt="img"></p>
+<p>我们查看Cr3指向的物理地址，当前共有4个PDE的有值的，而PDE的值，就是PTT的首地址，以第一个PDE（36c24067）为例，<strong>其中PTT的首地址为36c24000</strong>。</p>
+<h3 id="查看C0000000物理页"><a href="#查看C0000000物理页" class="headerlink" title="查看C0000000物理页"></a>查看C0000000物理页</h3><p>步骤和之前一样，就直接看结果好了。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-13-59-4a3cfbb23500f11b6115328b7352592e-pttPte-2f9739.png" alt="img"></p>
+<p>发现，C0000000这个线性地址所对应的物理页，刚好是36c24000，也就是第一个PDE对应的PTT的首地址。由此可以进一步推断，C0001000则是第二个PDE对应的PTT的首地址，以此类推。</p>
+<h2 id="再看10-10-12分页"><a href="#再看10-10-12分页" class="headerlink" title="再看10-10-12分页"></a>再看10-10-12分页</h2><p>现在再来看10-10-12分页时，看法就会有所不一样了。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-21-00-14-13-2ddf8fc54f95bffe55fbdd3b95417dbc-10-10-12-54e377.png" alt="img"></p>
+<ol>
+<li>实际上页表（PTT）被映射到了从0xC0000000到0xC03FFFFF的4M地址空间</li>
+<li>在这1024个表中有一张特殊的表：页目录表（PDT）</li>
+<li>页目录表（PDT）被映射到了0xC030000开始处的4KB大小的地址空间</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><h3 id="有了0xC0300000和0xC0000000能做什么？"><a href="#有了0xC0300000和0xC0000000能做什么？" class="headerlink" title="有了0xC0300000和0xC0000000能做什么？"></a>有了0xC0300000和0xC0000000能做什么？</h3><p>掌握了这两个地址，就掌握了一个进程所有的物理内存读写权限。</p>
+<p>公式总结：</p>
+<ul>
+<li>什么是PDI和PTI？ 将32位线性地址拆分位10(PDI)-10(PTI)-12</li>
+<li>访问页目录表(PDT)的公式：0xC0300000 + PDI x 4</li>
+<li>访问页表(PTT)的公式：0xC0000000 + PDI x 1000 + PTI x 4（不用*号因为会被转义）</li>
+</ul>
+<h3 id="其它关于页的细节"><a href="#其它关于页的细节" class="headerlink" title="其它关于页的细节"></a>其它关于页的细节</h3><ul>
+<li>高2G有一些大页，即4MB页</li>
+<li>两个进程低2G几乎不同，高2G几乎相同</li>
+<li>一个进程低2G的内存空间，前64K与后64K是没有使用的（线性地址0 - 00010000 与 7FFF0000 - 7FFFFFFFF）</li>
+</ul>
+<h3 id="谁填充了这些表呢"><a href="#谁填充了这些表呢" class="headerlink" title="谁填充了这些表呢"></a>谁填充了这些表呢</h3><p><strong>进程本身可以通过0xC0300000和0xC0000000访问修改任意物理页</strong>，那么是谁为我们填充0xC0300000和0xC0000000的PDE与PTE呢？</p>
+<p>进程的创建过程：当创建B进程时，先在A进程中将B进程所有信息全部构建好，然后切换Cr3即可。也就是说，最开始的这张表是由A进程填充的。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>保护模式</tag>
       </tags>
   </entry>
 </search>
