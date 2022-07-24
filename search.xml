@@ -566,9 +566,95 @@
       </tags>
   </entry>
   <entry>
-    <title></title>
-    <url>/2022/07/24/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/</url>
-    <content><![CDATA[]]></content>
+    <title>中断与异常</title>
+    <url>/2022/03/24/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/</url>
+    <content><![CDATA[<h2 id="中断"><a href="#中断" class="headerlink" title="中断"></a>中断</h2><h3 id="什么是中断"><a href="#什么是中断" class="headerlink" title="什么是中断"></a>什么是中断</h3><ol>
+<li>中断通常是由CPU外部的输入输出设别（<strong>硬件</strong>）所触发的，供外部设备通知CPU“有事情需要处理”，因此又叫做中断请求（<strong>IRQ-Interrupt Request</strong>）</li>
+<li>中断请求的目的是希望CPU暂时停止执行当前<strong>正在执行</strong>的程序，转去执行中断请求所对应的中断处理例程（<strong>中断处理程序在哪由IDT表决定</strong>）</li>
+<li>80x86有两条中断请求线：<ul>
+<li>不可屏蔽中断线，称为<strong>NMI（NonMaskable Interrupt）</strong></li>
+<li>可屏蔽中断线，称为<strong>INTR（Interrupt Require）</strong></li>
+</ul>
+</li>
+</ol>
+<h3 id="不可屏蔽中断"><a href="#不可屏蔽中断" class="headerlink" title="不可屏蔽中断"></a>不可屏蔽中断</h3><table>
+<thead>
+<tr>
+<th>（IDT表）中断号</th>
+<th>NMI</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0x2</td>
+<td>不可屏蔽中断</td>
+<td>80x86中固定为0x2</td>
+</tr>
+</tbody></table>
+<p>说明：</p>
+<ul>
+<li>当不可屏蔽中断产生时，CPU在执行完当前指令后会立即进入2号中断，执行相应中断处理程序</li>
+<li>不可屏蔽中断不受EFLAG寄存器中IF位的影响，一旦发生，CPU必须处理</li>
+</ul>
+<h3 id="可屏蔽中断"><a href="#可屏蔽中断" class="headerlink" title="可屏蔽中断"></a>可屏蔽中断</h3><p>在硬件级，可屏蔽中断是由一块专门的芯片来管理的，通常称为<strong>中断控制器</strong>。它负责分配中断资源和管理各个中断源发出的中断请求。为了便于标识各个中断请求，中断控制器通常用<strong>IRQ（Interrupt Request）</strong>后面加上数字来表示不同的中断。</p>
+<p>例如：在Windows中，时钟中断的IRQ编号为0，也就是：IRQ0</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-09-44-12c11df6822da09bd28c093a1bcf7e9d-time-785f23.png"></p>
+<table>
+<thead>
+<tr>
+<th>（IDT表）中断号</th>
+<th>IRQ</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0x30</td>
+<td>IRQ0</td>
+<td>时钟中断</td>
+</tr>
+<tr>
+<td>0x31~0x3F</td>
+<td>IRQ1~IRQ15</td>
+<td>其它硬件设备的中断</td>
+</tr>
+</tbody></table>
+<p>说明：</p>
+<ul>
+<li>如果自己的程序执行时不希望CPU去处理这些中断，可以用<strong>CLI</strong>指令清空EFLAG寄存器中的IF位。与CLI指令相反，<strong>STI</strong>指令可以用来设置EFLAG寄存器中的IF位</li>
+<li>硬件中断与IDT表中的对应关系并且固定不变的，参见<strong>APIC</strong>（高级可编程中断控制器）</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-09-52-aab31730dd09f458c47fcdca4df3fd67-APIC-1df766.png"></p>
+<h2 id="异常"><a href="#异常" class="headerlink" title="异常"></a>异常</h2><p>聊完了中断，来看看异常。异常通常是CPU在执行指令时检测到的某些错误，比如除0、访问无效页面等。</p>
+<h3 id="与中断的区别"><a href="#与中断的区别" class="headerlink" title="与中断的区别"></a>与中断的区别</h3><ul>
+<li>中断来自于外部设备，是中断源（例如键盘）发起的，CPU是被动的。</li>
+<li>异常来自于CPU本身，是CPU主动产生的。</li>
+<li>INT N虽然被称为“软件中断”，但其本质是<strong>异常</strong>。因此<strong>不受EFLAG的IF位影响</strong>。</li>
+</ul>
+<h3 id="异常处理"><a href="#异常处理" class="headerlink" title="异常处理"></a>异常处理</h3><p>无论是由硬件设备触发的<strong>中断请求</strong>还是由CPU产生的<strong>异常</strong>，<strong>处理程序都在IDT表</strong>。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-10-09-0f02282d6ae420ce56eb80f212bb696b-idt-87b515.png"></p>
+<p>上图为IDT表中常见的中断向量号的相关描述，具体细节可以参考Intel白皮书第三卷（Exception And Interrupt Reference）这章</p>
+<h3 id="缺页异常（无时无刻不在发生）"><a href="#缺页异常（无时无刻不在发生）" class="headerlink" title="缺页异常（无时无刻不在发生）"></a>缺页异常（无时无刻不在发生）</h3><p>缺页异常产生：</p>
+<ul>
+<li>当PDE&#x2F;PTE的P&#x3D;0时</li>
+<li>当PDE&#x2F;PTE的属性为只读，但程序试图写入时</li>
+</ul>
+<p>一旦发生缺页异常，CPU会执行IDT表中的0xE号中断处理程序，由操作系统接管。</p>
+<p>这里简单概括上述两种发生缺页异常的情况：</p>
+<ol>
+<li>在操作系统中，物理页往往是紧缺的，若当前PTE指向的物理页的内容一段时间没有被访问，则会将这个物理页上的内容存到一个文件里，同时将这个物理页挂给有需要的PTE用，并将原PTE的P位置0。当程序再次访问这段内容时，发现P位为0，则会触发缺页异常，但是此时PTE下标为10,11的位置均为0，其余位置都是有值的，这种情况说明当前PTE指向的内容存到了文件中，并根据下标1~4指定的偏移，在文件中找到内容。这时再重新给这些内容挂上新的物理页，将P位改为1，这时访问便可正常执行。当然，缺页异常对于用户来说是透明的，用户只会觉得自己正常访问了某个内容，但实际上进行了很多操作，通过缺页异常，操作系统可以节省大量物理页。 <img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-14-10-28-30cb6365ba122cd996320de91d9fb256-defaultPage-a6ea39.png">])</li>
+<li>当PDE&#x2F;PTE属性为只读时，CPU不会进行处理，而是跳到E号中断交给操作系统来处理，操作系统发现程序正在尝试写一个只读的物理页，会返回一个C0000005错误。</li>
+</ol>
+<h3 id="异常小节"><a href="#异常小节" class="headerlink" title="异常小节"></a>异常小节</h3><p>当异常发生时，CPU会判断异常的种类，根据中断向量号，跳转到相应的异常处理程序，接着由操作系统接管并处理。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这篇简要介绍了中断与异常，在后续讲到中断章节时，会更加详细的分析过程原理。</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
   </entry>
   <entry>
     <title>TLB&amp;控制寄存器</title>
