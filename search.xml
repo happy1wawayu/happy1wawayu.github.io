@@ -379,8 +379,8 @@
   <entry>
     <title>基址小实验（10-10-12）</title>
     <url>/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/</url>
-    <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过C0300000和C0000000这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
-<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://cataloc.gitee.io/blog/2020/03/19/PDE-PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
+    <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过<code>0xC0300000</code>和<code>0xC0000000</code>这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
+<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://happy1wawayu.github.io/2022/03/19/PDE_PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
 <h2 id="测试原始代码"><a href="#测试原始代码" class="headerlink" title="测试原始代码"></a>测试原始代码</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-06-946691fd700d1b1c1e8d4d29276e8289-before-414890.png"></p>
 <p>首先测试原始代码，发现直接修改常量区的字符串，是会失败的</p>
 <h2 id="提权进入0环"><a href="#提权进入0环" class="headerlink" title="提权进入0环"></a>提权进入0环</h2><p>提权这里还是会用到Windbg，根据调用函数的地址，填入段选择子，并通过调用门进行提权（就当复习调用门知识了）</p>
