@@ -326,12 +326,17 @@
 <li>U&#x2F;S &#x3D; 1：普通用户</li>
 </ul>
 <p>三环程序是不能读写高2G内存的，原因在于高2G内存对应的物理页U&#x2F;S位被置0了，也就是说只有特权用户才能读写高2G的内存。所以，当普通用户想要读取高2G内存时，就可以把U&#x2F;S置1，这样就可以访问高2G内存了。</p>
-<p>当然，理论如此，不过除了U&#x2F;S位外，影响高2G内存读写的还有PCD位和PWT位，这部分内容也要到控制寄存器部分才能讲，所以第二种3环程序读写高2G实验（第一种是通过门提权），就要放到后面实现了，这里只要先记住，U&#x2F;S位是影响访问读写权限的。</p>
+<p>当然，理论如此，不过除了U&#x2F;S位外，影响高2G内存读写的还有PCD位和PWT位，所以第二种3环程序读写高2G实验（第一种是通过门提权），就要放到后面实现了，这里只要先记住，U&#x2F;S位是影响访问读写权限的。</p>
 <h3 id="与R-x2F-W的区别"><a href="#与R-x2F-W的区别" class="headerlink" title="与R&#x2F;W的区别"></a>与R&#x2F;W的区别</h3><p>这里需要注意一下U&#x2F;S位与R&#x2F;W位的区别，U&#x2F;S位的读写控制是根据用户的级别，而R&#x2F;W位的控制是直接控制读写，不管你是不是特权用户。</p>
 <h2 id="A位"><a href="#A位" class="headerlink" title="A位"></a>A位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-29-37a2dc13f0cce521096c813fa5c743fc-A-bc4256.png"></p>
 <p>A（Accessed）位于PDE&#x2F;PTE的第5位：表示该物理页是否被访问（读或者写）过，访问过置1，即使只访问一个字节也会导致PDE，PTE置1。</p>
 <h2 id="D位"><a href="#D位" class="headerlink" title="D位"></a>D位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-28-43-ed7f9fa4d2217f1ef70ac21c89e68b85-D-57108f.png"></p>
 <p>D（Dirty），脏位，是否被写过。0表示没有被写过，1表示被写过</p>
+<h2 id="PWT"><a href="#PWT" class="headerlink" title="PWT"></a>PWT</h2><p>Page Write Through</p>
+<p>PWT &#x3D; 1 时 写CPU缓存的时候也要将数据写入内存中。</p>
+<h2 id="PCD"><a href="#PCD" class="headerlink" title="PCD"></a>PCD</h2><p>Page Cache Disable</p>
+<p>PCD &#x3D; 1时，禁止某个页写入缓存，直接写内存。</p>
+<p>比如，做页表用的页，已经存储在TLB中了，可能不需要再缓存了。</p>
 <h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>以上是关于PDE&#x2F;PTE部分属性的含义，还有一部分位没有涉及到，例如G位，PWT位，PCD位，这些需要讲到控制寄存器和TLB相关概念时再细讲。</p>
 ]]></content>
       <categories>
@@ -767,7 +772,7 @@
 <li>PSE：控制PDE中PS位的开关，当PSE置1时，PS位才有效。具体如下：</li>
 </ul>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-25-54-e0c3f779eaddaabf3d9e06f71fc9159a-PSE-794160.png"></p>
-<h3 id="控制寄存器小节"><a href="#控制寄存器小节" class="headerlink" title="控制寄存器小节"></a>控制寄存器小节</h3><p>除了上述介绍的，还有一个Cr8寄存器，仅仅在64位下才存在，这里就不作介绍了，其余寄存器总览如下：</p>
+<h3 id="控制寄存器小结"><a href="#控制寄存器小结" class="headerlink" title="控制寄存器小结"></a>控制寄存器小结</h3><p>除了上述介绍的，还有一个Cr8寄存器，仅仅在64位下才存在，这里就不作介绍了，其余寄存器总览如下：</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-26-29-74d02564f7c853aec3462d0d4959b266-cr-bdda4d.png"></p>
 ]]></content>
       <categories>
