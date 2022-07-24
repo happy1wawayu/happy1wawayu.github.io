@@ -565,4 +565,132 @@
         <tag>Windows内核</tag>
       </tags>
   </entry>
+  <entry>
+    <title></title>
+    <url>/2022/07/24/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/</url>
+    <content><![CDATA[]]></content>
+  </entry>
+  <entry>
+    <title>TLB&amp;控制寄存器</title>
+    <url>/2022/03/23/TLB&amp;%E6%8E%A7%E5%88%B6%E5%AF%84%E5%AD%98%E5%99%A8/</url>
+    <content><![CDATA[<h2 id="TLB"><a href="#TLB" class="headerlink" title="TLB"></a>TLB</h2><h3 id="设计原因"><a href="#设计原因" class="headerlink" title="设计原因"></a>设计原因</h3><ol>
+<li>假设我们通过一个线性地址访问一个物理页，想要去读取物理页上某个字节。但是实际过程中，并非只读了1个字节，我们需要先读取PDE，再读取PTE，最后再读取存放1个字节的物理页，读取的内容远远超过1个字节了。</li>
+<li>在2-9-9-12分页下，会多读24个字节，如果读取的内容跨页了（存在两个不同的物理页上），那多读的字节会更多</li>
+</ol>
+<p>为了提高效率，只能通过做记录来进行弥补。</p>
+<p>因此CPU内部设计了一个表，用来做记录；由于位于CPU内部，速度和寄存器一样快，当然，表也不能做的过大。这个表叫做<strong>TLB（Translation Lookaside Buffer）</strong>，用于<strong>地址解析</strong></p>
+<h3 id="TLB结构"><a href="#TLB结构" class="headerlink" title="TLB结构"></a>TLB结构</h3><table>
+<thead>
+<tr>
+<th>LA（线性地址）</th>
+<th>PA（物理地址）</th>
+<th>ATTR（属性）</th>
+<th>LRU（统计）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>xxxxxxxx</td>
+<td>xxxxxxxx</td>
+<td>xxxxxxxx</td>
+<td>xxxxxxxx</td>
+</tr>
+</tbody></table>
+<p>说明：</p>
+<ul>
+<li>ATTR（属性)：PAE分页，用PDPE&amp;PDE&amp;PTE。10-10-12分页则PDE&amp;PTE</li>
+<li>不同CPU的TLB表大小不一样</li>
+<li>只要Cr3改变了（<strong>说明进程切换了</strong>），先前的TLB则会失效，换一套新的TLB，一核一套TLB</li>
+</ul>
+<p>由于操作系统中的高2G映射基本不变，如果Cr3改了，直接刷新TLB，对于重建高2G以上的对应关系很浪费，所PDE和PTE中有个标志位G位，<strong>刷新TLB时将不会刷新PDE&#x2F;PTE的G位为1的页</strong>。若TLB满了，则CPU会根据统计信息将不常用的地址废弃，保留最近最常用的</p>
+<p>注意：只有当PDE的PS位为1时（即当前物理页为大页），G位才有效。</p>
+<h3 id="TLB种类"><a href="#TLB种类" class="headerlink" title="TLB种类"></a>TLB种类</h3><p>TLB在x86体系的CPU里的实际应用最早是从Intel的486CPU开始的，在x86的CPU里，一般都设有如下4组TLB：</p>
+<ul>
+<li>缓存一般页表（4K字节页面）的指令页表缓存（Instruction-TLB）</li>
+<li>缓存一般页表（4K字节页面）的数据页表缓存（Data-TLB）</li>
+<li>缓存大尺寸页表（2M&#x2F;4M字节页面）的指令页表缓存（Instruction-TLB）</li>
+<li>缓存大尺寸页表（2M&#x2F;4M字节页面）的数据页表缓存（Instruction-TLB）</li>
+</ul>
+<h3 id="TLB验证"><a href="#TLB验证" class="headerlink" title="TLB验证"></a>TLB验证</h3><p>呵呵，这个破实验花了我一下午，我真是太菜了，一个原因是0地址挂物理页，踩了好几次坑，第二个是VC6很多强转不支持，耽误了很多时间。给0地址挂物理页的步骤就不赘述了，这里采用的10-10-12分页，只是采用了代码挂物理页的方式，具体可以参考<a href="https://happy1wawayu.github.io/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/">基址小实验</a>这一篇，这里就讲讲验证的过程。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/addr1.png"></p>
+<p>我们先给0地址挂上第一个地址（0x425000，这是我随便选的，选错了可能蓝屏）的物理页，然后取0地址的处的置，发现值为0。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/addr2.png"></p>
+<p>这时，我们注释掉给0地址挂第一个地址（0x425000）的物理页的代码，并给0地址挂第二个地址（0x426000）的物理页。这时再取0地址处的值，发现值为0x43，可以发现，这两个线性地址所对应的物理页上的值是不同的。</p>
+<p>这时我们把上面的注释拿掉，先给0地址挂第一个地址的物理页，然后再给0地址挂第二个地址的物理页，按照道理，这时我们取到的值应该是第二个地址对应物理页上的值，我们来查看结果：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/tlb.png"></p>
+<p>神奇的事情发生了，我们取到的仍然是第一个地址对应物理页上的值，这其实就是TLB的作用。</p>
+<p>这时，我们增加一条语句</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">invlpg dword ptr ds:[0]</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-23-41-6a903226d1b14aca38dc0b1c31a11708-invlpg-348c97.png"></p>
+<p>再次运行程序发现，仅仅多了这一条语句，读取0地址的值，就变成了第二个地址对应物理页上的值，Invlpg是让指定页TLB无效化的指令，因此再次访问时，原先的TLB已经被废弃，就需要重新去物理页读取，此时0地址对应的物理页已经是第二个地址的物理页了。当然，除了使用Invlpg指令，修改Cr3也可以做到让TLB无效化。</p>
+<p>下面附上完整代码</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;stdafx.h&quot;</span><br><span class="line">#include </span><br><span class="line"></span><br><span class="line">DWORD phyAddr, phyAddr2, temp;</span><br><span class="line"></span><br><span class="line">__declspec(naked) Test() &#123;</span><br><span class="line">	_asm &#123;</span><br><span class="line">		pushad</span><br><span class="line">		pushfd</span><br><span class="line">	&#125;	</span><br><span class="line">	phyAddr = (DWORD)(0xc0000000 + ((0x425000 &gt;&gt; 0xa) &amp; 0x3ffffc));</span><br><span class="line">	phyAddr2 = (DWORD)(0xc0000000 + ((0x426000 &gt;&gt; 0xa) &amp; 0x3ffffc));</span><br><span class="line"></span><br><span class="line">	_asm&#123;</span><br><span class="line">		mov eax, phyAddr</span><br><span class="line">		mov eax, [eax]</span><br><span class="line">		mov dword ptr ds:[0xc0000000], eax</span><br><span class="line">		mov eax, dword ptr ds:[0]</span><br><span class="line">		mov temp, eax</span><br><span class="line"></span><br><span class="line">//		invlpg dword ptr ds:[0]		无效化指定页的TLB</span><br><span class="line">//		mov eax, cr3			 	切换Cr3来清空TLB</span><br><span class="line">//		mov cr3, eax</span><br><span class="line">	</span><br><span class="line">		mov eax, phyAddr2</span><br><span class="line">		mov eax, [eax]</span><br><span class="line">		mov dword ptr ds:[0xc0000000], eax</span><br><span class="line">		mov eax, dword ptr ds:[0]</span><br><span class="line">		mov temp, eax</span><br><span class="line">	&#125;</span><br><span class="line">	</span><br><span class="line">	_asm&#123;</span><br><span class="line">		popfd</span><br><span class="line">		popad</span><br><span class="line">		retf</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">int main(int argc, char* argv[])</span><br><span class="line">&#123;</span><br><span class="line">	char buffer[] = &#123;0, 0, 0, 0, 0x4B, 0&#125;;</span><br><span class="line">	_asm call fword ptr buffer</span><br><span class="line">	</span><br><span class="line">	printf(&quot;temp: %x&quot;, temp);</span><br><span class="line">	getchar();</span><br><span class="line">	return 0;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="控制寄存器"><a href="#控制寄存器" class="headerlink" title="控制寄存器"></a>控制寄存器</h2><p>说完了TLB，来说说控制寄存器。控制寄存器的作用主要是用于控制和确定CPU的操作模式。主要包括Cr0，Cr1，Cr2，Cr3，Cr4，其中Cr1保留。</p>
+<h3 id="Cr0寄存器"><a href="#Cr0寄存器" class="headerlink" title="Cr0寄存器"></a>Cr0寄存器</h3><p>Cr0寄存器，主要包括一些控制操作系统模式以及处理器状态的控制标志位。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-24-40-04a60f21d98591bb61384c167974299a-cr0-5c3dad.png"></p>
+<p>这里介绍几个主要的标志位，其余位的描述可以参考Intel白皮书第三卷系统架构综述那章。</p>
+<ol>
+<li>PE：Cr0下标为0的位是启用保护（Protection Enable）标志。PE&#x3D;1保护模式，PE&#x3D;0实地址模式，<strong>这个标志仅开启段级保护，而并没有启用分页机制</strong>。若要启用分页机制，那么PE和PG标志都要置位。</li>
+<li>PG：当设置该位时即开启了分页机制。在<strong>开启这个标志之前必须已经或者同时开启PE标志</strong>。<ul>
+<li>PG&#x3D;0且PE&#x3D;0：处理器工作在实地址模式下</li>
+<li>PG&#x3D;0且PE&#x3D;1：处理器工作在没有开启分页机制的保护模式下（不存在这样的操作系统）</li>
+<li>PG&#x3D;1且PE&#x3D;0：在PE没有开启的情况下 无法开启PG</li>
+<li>PG&#x3D;1且PE&#x3D;1：处理器工作在开启了分页机制的保护模式下</li>
+</ul>
+</li>
+<li>WP：对于Intel 80486或以上的CPU，CR0的位16是写保护（Write Proctect）标志，当设置该标志时，处理器会禁止超级用户程序（例如特权级0的程序）向用户级只读页面执行写操作。<ul>
+<li>对于Ring0的特权级程序，如果WP&#x3D;0，可以<strong>读写</strong>任意用户级物理页，只要线性地址有效</li>
+<li>对于Ring0的特权级程序，如果 WP&#x3D;1 可以<strong>读取</strong>任意用户级物理页，但对于只读的物理页，则不能写</li>
+</ul>
+</li>
+</ol>
+<h3 id="Cr2寄存器"><a href="#Cr2寄存器" class="headerlink" title="Cr2寄存器"></a>Cr2寄存器</h3><p>Cr2寄存器，保存导致缺页异常的线性地址。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-25-00-4328630b17f5ab432f35653467b157b5-cr2-4595af.png"></p>
+<p>之前在中断与异常中，简要概括了<a href="https://cataloc.gitee.io/blog/2020/03/23/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/#%E7%BC%BA%E9%A1%B5%E5%BC%82%E5%B8%B8%EF%BC%88%E6%97%A0%E6%97%B6%E6%97%A0%E5%88%BB%E4%B8%8D%E5%9C%A8%E5%8F%91%E7%94%9F%EF%BC%89">缺页异常</a>，当CPU访问某个无效页面，会产生缺页异常，此时，CPU会将引起异常的线性地址存放在Cr2中，以便操作系统处理完缺页异常后，返回到原本执行的位置继续执行。</p>
+<h3 id="Cr3寄存器"><a href="#Cr3寄存器" class="headerlink" title="Cr3寄存器"></a>Cr3寄存器</h3><p>Cr3我们太熟悉了，在10-10-12分页是页目录表基址，在PAE分页下，则是页目录指针表基址</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-25-09-e29215802d8a79b51dcaff1041cc4635-cr3-d1cb62.png"></p>
+<p>这里有两个属性，PWT和PCD之前在页的部分一直没有讲，在介绍之前，先来了解一个概念，叫做CPU缓存</p>
+<h4 id="CPU缓存"><a href="#CPU缓存" class="headerlink" title="CPU缓存"></a>CPU缓存</h4><ol>
+<li>CPU缓存是位于CPU与物理内存之间的临时存储器，它的容量比内存小的多，但是交换速度远快于内存。</li>
+<li>CPU缓存可以做的很大，从几K，几十K，几百K，甚至上M。</li>
+<li>CPU缓存与TLB的区别：<ul>
+<li>TLB：线性地址 &lt;—–&gt; 物理地址</li>
+<li>CPU缓存： 物理地址 &lt;—–&gt; 内存</li>
+</ul>
+</li>
+</ol>
+<p>有了CPU缓存和TLB的概念后，就可以来讲讲PWT和PCD这俩属性了。</p>
+<h4 id="PWT-Page-Write-Through"><a href="#PWT-Page-Write-Through" class="headerlink" title="PWT(Page Write Through)"></a>PWT(Page Write Through)</h4><ul>
+<li>PWT &#x3D; 1时，CPU向cache写入数据时，同时向memory也写一份，使cache和memory的数据保持一致。优点是简单，缺点是每次都要访问memory，速度比较慢，即Write Through。</li>
+<li>PWT &#x3D; 0时，CPU向cache写入数据时，不将数据写入内存中，分为两种情况：<ol>
+<li>Post Write：CPU更新cache数据时，把更新的数据写入到一个更新缓冲器，在合适的时候才对memory进行更新。这样可以提高cache访问速度，但是，在数据连续被更新两次以上的时候，缓冲区将不够使用，被迫同时更新memory。</li>
+<li>Write Back：CPU更新cache时，只是把更新的cache区标记一下，并不同步更新memory。只是在cache区要被新进入的数据取代时，才更新memory。这样做的原因是考虑到很多时候cache存入的是中间结果，没有必要同步更新memory。优点是CPU执行的效率提高，缺点是实现起来技术比较复杂。</li>
+</ol>
+</li>
+</ul>
+<h4 id="PCD-Page-Cache-Disable"><a href="#PCD-Page-Cache-Disable" class="headerlink" title="PCD(Page Cache Disable)"></a>PCD(Page Cache Disable)</h4><ul>
+<li>PCD &#x3D; 1时，禁止某个页写入缓存，直接写入内存。例如，做页表用的页，已经存储在TLB中了，可能不需要再缓存了。</li>
+<li>PCD &#x3D; 0时，不限制页写入缓存，可以参考上面PWT的情况。</li>
+</ul>
+<h3 id="Cr4寄存器"><a href="#Cr4寄存器" class="headerlink" title="Cr4寄存器"></a>Cr4寄存器</h3><p>Cr4寄存器，保存了一组启用多种架构扩展的标志位</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-25-25-012ebd6b86afb5af3d979ae357997d10-cr4-f47718.png" alt="(https://cataloc.gitee.io/blog/2020/03/24/TLB%EF%BC%8C%E6%8E%A7%E5%88%B6%E5%AF%84%E5%AD%98%E5%99%A8/cr4.png)"></p>
+<p>这里简单概括一下PAE位和PSE位：</p>
+<ul>
+<li>PAE：置1时，是PAE分页；置0时，是10-10-12分页。之前在boot.ini中设置execute&#x2F;noexecute的作用就是修改PAE位</li>
+<li>PSE：控制PDE中PS位的开关，当PSE置1时，PS位才有效。具体如下：</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-25-54-e0c3f779eaddaabf3d9e06f71fc9159a-PSE-794160.png"></p>
+<h3 id="控制寄存器小节"><a href="#控制寄存器小节" class="headerlink" title="控制寄存器小节"></a>控制寄存器小节</h3><p>除了上述介绍的，还有一个Cr8寄存器，仅仅在64位下才存在，这里就不作介绍了，其余寄存器总览如下：</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-26-29-74d02564f7c853aec3462d0d4959b266-cr-bdda4d.png"></p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>保护模式</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
 </search>
