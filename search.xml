@@ -218,7 +218,7 @@
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">80511987 8b4d08          mov     ecx,dword ptr [ebp+8]	//获取参数</span><br><span class="line">8051198a 56              push    esi	</span><br><span class="line">8051198b 8bc1            mov     eax,ecx</span><br><span class="line">8051198d c1e812          shr     eax,12h		//右移18位</span><br><span class="line">80511990 bef83f0000      mov     esi,3FF8h	</span><br><span class="line">80511995 23c6            and     eax,esi		//进行与运算，余下11位有效位</span><br><span class="line">80511997 2d0000a03f      sub     eax,3FA00000h		//相当于add eax, 0xC0600000</span><br><span class="line">8051199c 8b10            mov     edx,dword ptr [eax]	//取PDE低四字节</span><br><span class="line">8051199e 8b4004          mov     eax,dword ptr [eax+4]	//取PDE高四字节</span><br><span class="line">805119a1 8945fc          mov     dword ptr [ebp-4],eax	//高四字节保存到局部变量</span><br><span class="line">805119a4 8bc2            mov     eax,edx</span><br><span class="line">805119a6 57              push    edi			//保存edi原本的值</span><br><span class="line">805119a7 83e001          and     eax,1			//保留P位的值</span><br><span class="line">805119aa 33ff            xor     edi,edi</span><br><span class="line">805119ac 0bc7            or      eax,edi</span><br></pre></td></tr></table></figure>
 
 <ul>
-<li>右移18位后，进行了一次与运算，保留的位相当于PDPI x 4KB + PDI x 8（看不明白的可以<a href="https://happy1wawayu.github.io/2022/03/21/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/#%E5%B7%A7%E5%A6%99%E7%9A%84%E4%B8%8E%E8%BF%90%E7%AE%97">参考这篇</a>）</li>
+<li>右移18位后，进行了一次与运算，保留的位相当于PDPI x 4KB + PDI x 8（看不明白的可以<a href="https://happy1wawayu.github.io/2022/03/21/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E9%80%86%E5%90%91%E5%88%86%E6%9E%90MmIsAddressValid/#%E5%B7%A7%E5%A6%99%E7%9A%84%E4%B8%8E%E8%BF%90%E7%AE%97">参考这篇</a>）</li>
 <li>sub eax, 0x3FA00000和add eax, 0xC0600000，因此可以推测，<strong>PAE分页下PDT的基址为0xC0600000</strong></li>
 </ul>
 <p>接着分析查找PTE的部分</p>
@@ -272,7 +272,7 @@
 <p>物理页的属性 &#x3D; PDE属性 &amp; PTE属性</p>
 <h2 id="P位"><a href="#P位" class="headerlink" title="P位"></a>P位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-25-58-913745745e113b72fb181b8d6862b42a-p-8d5c7d.png"></p>
 <p>首先来看P（Present）位：存在位。PDE与PTE的P位均位1时，物理页有效；其余情况，物理页不存在。这也解释了为什么PDE的第三行和PTE的第二行可以直接忽略。</p>
-<p>在上一篇文章中，有一个关于<a href="https://happy1wawayu.github.io/2022/03/18/10-10-12%E5%88%86%E9%A1%B5/#0%E5%9C%B0%E5%9D%80%E4%B9%9F%E8%83%BD%E5%AD%98%E5%80%BC%EF%BC%9F">0地址赋值</a>的实验。0地址之所以不能赋值是因为它的PTE的P位为0，在我们修改了PTE的P位，并给它挂上一个物理页后，0地址遍可以赋值了。</p>
+<p>在上一篇文章中，有一个关于<a href="https://happy1wawayu.github.io/2022/03/18/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/10-10-12%E5%88%86%E9%A1%B5/#0%E5%9C%B0%E5%9D%80%E4%B9%9F%E8%83%BD%E5%AD%98%E5%80%BC%EF%BC%9F">0地址赋值</a>的实验。0地址之所以不能赋值是因为它的PTE的P位为0，在我们修改了PTE的P位，并给它挂上一个物理页后，0地址遍可以赋值了。</p>
 <h2 id="R-x2F-W位"><a href="#R-x2F-W位" class="headerlink" title="R&#x2F;W位"></a>R&#x2F;W位</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-19-27-21-b034176b9f80e03df97fcfe7af55f9b4-RW-a6c90a.png"></p>
 <ul>
 <li>R&#x2F;W &#x3D; 0 只读</li>
@@ -366,7 +366,7 @@
 <li>缓存大尺寸页表（2M&#x2F;4M字节页面）的指令页表缓存（Instruction-TLB）</li>
 <li>缓存大尺寸页表（2M&#x2F;4M字节页面）的数据页表缓存（Instruction-TLB）</li>
 </ul>
-<h3 id="TLB验证"><a href="#TLB验证" class="headerlink" title="TLB验证"></a>TLB验证</h3><p>呵呵，这个破实验花了我一下午，我真是太菜了，一个原因是0地址挂物理页，踩了好几次坑，第二个是VC6很多强转不支持，耽误了很多时间。给0地址挂物理页的步骤就不赘述了，这里采用的10-10-12分页，只是采用了代码挂物理页的方式，具体可以参考<a href="https://happy1wawayu.github.io/2022/03/20/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/">基址小实验</a>这一篇，这里就讲讲验证的过程。</p>
+<h3 id="TLB验证"><a href="#TLB验证" class="headerlink" title="TLB验证"></a>TLB验证</h3><p>呵呵，这个破实验花了我一下午，我真是太菜了，一个原因是0地址挂物理页，踩了好几次坑，第二个是VC6很多强转不支持，耽误了很多时间。给0地址挂物理页的步骤就不赘述了，这里采用的10-10-12分页，只是采用了代码挂物理页的方式，具体可以参考<a href="https://happy1wawayu.github.io/2022/03/20/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/">基址小实验</a>这一篇，这里就讲讲验证的过程。</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/addr1.png"></p>
 <p>我们先给0地址挂上第一个地址（0x425000，这是我随便选的，选错了可能蓝屏）的物理页，然后取0地址的处的置，发现值为0。</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/addr2.png"></p>
@@ -403,7 +403,7 @@
 </ol>
 <h3 id="Cr2寄存器"><a href="#Cr2寄存器" class="headerlink" title="Cr2寄存器"></a>Cr2寄存器</h3><p>Cr2寄存器，保存导致缺页异常的线性地址。</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-25-00-4328630b17f5ab432f35653467b157b5-cr2-4595af.png"></p>
-<p>之前在中断与异常中，简要概括了<a href="https://cataloc.gitee.io/blog/2020/03/23/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/#%E7%BC%BA%E9%A1%B5%E5%BC%82%E5%B8%B8%EF%BC%88%E6%97%A0%E6%97%B6%E6%97%A0%E5%88%BB%E4%B8%8D%E5%9C%A8%E5%8F%91%E7%94%9F%EF%BC%89">缺页异常</a>，当CPU访问某个无效页面，会产生缺页异常，此时，CPU会将引起异常的线性地址存放在Cr2中，以便操作系统处理完缺页异常后，返回到原本执行的位置继续执行。</p>
+<p>之前在中断与异常中，简要概括了<a href="https://happy1wawayu.github.io/2022/03/24/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/#%E7%BC%BA%E9%A1%B5%E5%BC%82%E5%B8%B8%EF%BC%88%E6%97%A0%E6%97%B6%E6%97%A0%E5%88%BB%E4%B8%8D%E5%9C%A8%E5%8F%91%E7%94%9F%EF%BC%89">缺页异常</a>，当CPU访问某个无效页面，会产生缺页异常，此时，CPU会将引起异常的线性地址存放在Cr2中，以便操作系统处理完缺页异常后，返回到原本执行的位置继续执行。</p>
 <h3 id="Cr3寄存器"><a href="#Cr3寄存器" class="headerlink" title="Cr3寄存器"></a>Cr3寄存器</h3><p>Cr3我们太熟悉了，在10-10-12分页是页目录表基址，在PAE分页下，则是页目录指针表基址</p>
 <p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-24-13-25-09-e29215802d8a79b51dcaff1041cc4635-cr3-d1cb62.png"></p>
 <p>这里有两个属性，PWT和PCD之前在页的部分一直没有讲，在介绍之前，先来了解一个概念，叫做CPU缓存</p>
@@ -596,7 +596,6 @@
 <li>位图控制：这是一个默认值为0x20AC0000</li>
 </ul>
 <p>构造完的TSS如下：</p>
-<p>C</p>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">DWORD tss[0x68] = &#123;</span><br><span class="line">		0x00000000,	//Previous Task Link</span><br><span class="line">		(DWORD)stack,	//ESP0</span><br><span class="line">		0x00000010,	//SS0</span><br><span class="line">		0x00000000, //ESP1</span><br><span class="line">		0x00000000, //SS1</span><br><span class="line">		0x00000000, //ESP2</span><br><span class="line">		0x00000000, //SS2</span><br><span class="line">		(DWORD)Cr3,	//Cr3</span><br><span class="line">		0x00401020,	//EIP</span><br><span class="line">		0x00000000,	//EFLAGS</span><br><span class="line">		0x00000000,	//EAX</span><br><span class="line">		0x00000000,	//ECX</span><br><span class="line">		0x00000000,	//EDX</span><br><span class="line">		0x00000000,	//EBX</span><br><span class="line">		(DWORD)stack,	//ESP</span><br><span class="line">		0x00000000,	//EBP</span><br><span class="line">		0x00000000,	//ESI</span><br><span class="line">		0x00000000,	//EDI</span><br><span class="line">		0x00000023,	//ES</span><br><span class="line">		0x00000008, //CS</span><br><span class="line">		0x00000010,	//SS</span><br><span class="line">		0x00000023,	//DS</span><br><span class="line">		0x00000030,	//FS</span><br><span class="line">		0x00000000,	//GS</span><br><span class="line">		0x00000000,	//LDT</span><br><span class="line">		0x20ac0000	//IO_MAP</span><br><span class="line">	&#125;;</span><br></pre></td></tr></table></figure>
 
 <p>然后我们需要根据这个TSS的地址，来构造我们的TSS段描述符</p>
@@ -662,7 +661,7 @@
     <title>基址小实验（10-10-12）</title>
     <url>/2022/03/20/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E5%9F%BA%E5%9D%80%E5%B0%8F%E5%AE%9E%E9%AA%8C/</url>
     <content><![CDATA[<p>在学习完页目录表基址，页表基址后，我们知道通过<code>0xC0300000</code>和<code>0xC0000000</code>这两个地址，可以访问相应的PDE和PTE，今天就来实践一下。</p>
-<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://happy1wawayu.github.io/2022/03/19/PDE_PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
+<p>之前在介绍PDE&#x2F;PTE属性R&#x2F;W位时有过一个实验，是<a href="https://happy1wawayu.github.io/2022/03/19/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/PDE_PTE%E5%B1%9E%E6%80%A7/#R-W%E4%BD%8D">对位于常量区的内容进行修改</a>，当时通过Windbg修改了所在PDE&#x2F;PTE的R&#x2F;W位。这次实验，我们利用页目录表&#x2F;页表基址来进行修改。</p>
 <h2 id="测试原始代码"><a href="#测试原始代码" class="headerlink" title="测试原始代码"></a>测试原始代码</h2><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-23-14-14-06-946691fd700d1b1c1e8d4d29276e8289-before-414890.png"></p>
 <p>首先测试原始代码，发现直接修改常量区的字符串，是会失败的</p>
 <h2 id="提权进入0环"><a href="#提权进入0环" class="headerlink" title="提权进入0环"></a>提权进入0环</h2><p>提权这里还是会用到Windbg，根据调用函数的地址，填入段选择子，并通过调用门进行提权（就当复习调用门知识了）</p>
