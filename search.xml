@@ -844,4 +844,106 @@
         <tag>保护模式</tag>
       </tags>
   </entry>
+  <entry>
+    <title>API函数的调用过程（3环进0环）</title>
+    <url>/2022/03/26/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E8%BF%9B0%E7%8E%AF%EF%BC%89/</url>
+    <content><![CDATA[<p>上一篇中分析了ReadProcessMemory函数的3环部分，它实际上没有做太多工作，只是提供了一个调用0环函数的接口，今天我们接着向下分析，看看函数是如何进入0环的。</p>
+<h2 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h2><h3 id="KUSER-SHARED-DATA"><a href="#KUSER-SHARED-DATA" class="headerlink" title="_KUSER_SHARED_DATA"></a>_KUSER_SHARED_DATA</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-26-25-e0aa1cbe699ec4228d8a655bec22b19f-nrvm-ca13f1.png"></p>
+<p>上一篇讲到了NtReadVirtualMemory这部分，调用了一个函数地址0x7FFE0300。那这个地址有什么用呢？这就要介绍一个新的结构_KUSER_SHARED_DATA：</p>
+<ol>
+<li>在User层和Kernel层分别定义了一个_KUSER_SHARED_DATA结构区域，用于User层和Kernel层共享某些数据</li>
+<li>它们使用固定的地址值映射，_KUSER_SHARED_DATA结构区域在User和Kernel层地址分别为：<ul>
+<li>User层地址为：0x7FFE0000</li>
+<li>Kernel层地址为：0xFFDF0000</li>
+</ul>
+</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-27-56-1fe10ed8bfc1a6205620f24b0f85028b-kusd-900487.png"></p>
+<p><strong>注意</strong>：虽然指向的是同一个物理页，但在User层是只读的，在Kernel层是可写的</p>
+<h3 id="SystemCall"><a href="#SystemCall" class="headerlink" title="SystemCall"></a>SystemCall</h3><p>现在我们知道，0x7FFE0000处是_KUSER_SHARED_DATA结构，使用dt指令查看结构，查找0x300偏移处，也就是0x7FFE0300的位置，这个字段是SystemCall</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-32-44-2958966e1321945bf0026aceea19d9e5-systemCall-229b7f.png"></p>
+<p>那这个SystemCall有什么用呢？</p>
+<p>SystemCall的作用是选择以什么方式进入0环。这要看CPU是否支持sysenter&#x2F;sysexit</p>
+<ul>
+<li>支持：ntdll.dll!KiFastSystemCall()</li>
+<li>不支持：ntdll.dll!KiIntSystemCall()</li>
+</ul>
+<p>那如何看CPU是否支持sysenter&#x2F;sysexit指令呢？</p>
+<ol>
+<li>（OD打开任一程序）将eax置1（参数）</li>
+<li>将ecx，edx置0（方便查看）</li>
+<li>执行指令cpuid</li>
+<li>查看edx的SEP位（下标11的位置），若值为1，说明支持sysenter&#x2F;sysexit</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-33-59-62d53dcb5ce2547ee6df9ad726b4c02c-cpuidBefore-0461cf.png"> <img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-34-05-4b3a7edeb89b88f495fd323d4162127c-cpuidAfter-d30ae8.png"></p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">FBFF -&gt; 1111 1011 1111 1111  // 说明本机支持sysenter/sysexit</span><br></pre></td></tr></table></figure>
+
+<h2 id="KiIntSystemCall进0环-中断门"><a href="#KiIntSystemCall进0环-中断门" class="headerlink" title="KiIntSystemCall进0环(中断门)"></a>KiIntSystemCall进0环(中断门)</h2><p>在学过调用门，中断门后，我们知道，凡是提权（例如进0环），都伴随着寄存器中的值发生改变，包括CS，SS，EIP，ESP。所以我们分别分析一下两种进0环方式，看看他们是如何修改寄存器的值的，先从KiIntSystemCall开始。</p>
+<h3 id="获取提权后寄存器的值"><a href="#获取提权后寄存器的值" class="headerlink" title="获取提权后寄存器的值"></a>获取提权后寄存器的值</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-36-28-48500c2bc822157714751efd4d5978a9-kisc-325574.png"></p>
+<p>KiIntSystemCall进0环的方式非常简单，就是我们最熟悉中断门。（这里第一条指令的作用是<strong>获取参数的首地址</strong>）</p>
+<p>中断门就很熟悉了，进入IDT表看下0x2E对应的门描述符</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-37-30-5eef1172e8c784849e377680ce386301-0x2e-20a20e.png"></p>
+<p>根据中断门描述符，可以很快得到：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CS = 0x8 EIP = 8053e481</span><br></pre></td></tr></table></figure>
+
+<p>至于SS，和ESP，会在程序提权时，由tr寄存器指向的TSS中的ESP0和SS0提供。</p>
+<h3 id="KiSystemService"><a href="#KiSystemService" class="headerlink" title="KiSystemService"></a>KiSystemService</h3><p>根据EIP的值，0x8053e481我们可以定位到一个内核函数KiSystemService</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-38-30-52c21806a88c8797e077581859512f0e-kss-684454.png"></p>
+<p>这样就说明进入0环了，所以KiIntSystemCall进0环非常好理解，就是中断门的知识，进入0环后，就跳转到KiSystemService继续执行，至于如何找到想要执行的函数，会在后面的文章中介绍。接下来我们来看支持sysenter&#x2F;sysexit的KiFastSystemCall是如何进入0环的。</p>
+<h2 id="KiFastSystemCall进0环（快速调用）"><a href="#KiFastSystemCall进0环（快速调用）" class="headerlink" title="KiFastSystemCall进0环（快速调用）"></a>KiFastSystemCall进0环（快速调用）</h2><p>事实上，基本上现在的CPU都支持sysenter&#x2F;sysexit，默认也是通过KiFastSystemCall进0环，为什么呢？顾名思义，因为快啊。因为KiFastSystemCall不需要像中断门进0环时，去查IDT表找CS，EIP，查TSS找ESP和SS，而是直接从寄存器里读取这些数据。</p>
+<h3 id="获取提权后寄存器的值-1"><a href="#获取提权后寄存器的值-1" class="headerlink" title="获取提权后寄存器的值"></a>获取提权后寄存器的值</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-39-36-891c22733bf2b54eb808bcad3cf1da6e-kfsc-dc4a74.png"></p>
+<p>来看KiFastSystemCall，只有两行指令。sysenter指令，又称作快速调用，当CPU支持sysenter指令时，<strong>操作系统</strong>会提前将CS，SS，ESP，EIP写入到MSR寄存器中，当sysenter指令执行时，CPU直接从MSR中将这些值写入相应寄存器中，<strong>没有读取内存的过程</strong>，所以叫做快速调用。</p>
+<h4 id="MSR寄存器"><a href="#MSR寄存器" class="headerlink" title="MSR寄存器"></a>MSR寄存器</h4><p>由于MSR寄存器非常大，这里不细讲，只列出用到的值</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-40-32-52a8b2a6fcee33cdb1ed1fe470ff6a0c-msr-54f99f.png"></p>
+<p>可以通过RDMSR&#x2F;WRMST来进行读写（操作系统使用WRMST写该寄存器）</p>
+<p>这里读取ESP，EIP，CS的值（<strong>SS的值可以通过CS+8计算而得</strong>）</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-41-16-8a6ccc5cc43ecf17f9601111b0631b53-msrValue-73019a.png"></p>
+<p>这样，在进入0环时，便能通过MSR寄存器切换4个寄存器的值了</p>
+<p><strong>注意</strong>：</p>
+<ul>
+<li>在执行<strong>sysenter</strong>指令时，只有<strong>CS</strong>、<strong>ESP</strong>、<strong>EIP</strong>三个寄存器的值可从MSR寄存器中获得，<strong>其中并不包括SS！</strong></li>
+<li><code>SS</code>&#x3D; <strong>IA32_SYSENTER_CS</strong> + <strong>8</strong></li>
+<li>这些操作与<strong>操作系统</strong>无关，而是<strong>硬件</strong>（CPU）做的<code>（参考Intel白皮书第二卷）</code></li>
+</ul>
+<h3 id="KiFastCallEntry"><a href="#KiFastCallEntry" class="headerlink" title="KiFastCallEntry"></a>KiFastCallEntry</h3><p>前面讲了KiIntSystemCall进入0环后执行KiSystemService，KiFastSystemCall当然也有，执行的是另一个函数，通过MSR得到的EIP我们可以找到函数KiFastCallEntry，同样是内核函数。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-43-35-42c332e010267abcb3471aa2284abfc0-kfce-0e98b3.png"></p>
+<p>这样便成功进入0环了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>进0环的过程非常好理解，一种是咱们熟悉的中断门，另一种快速调用。</p>
+<ol>
+<li><strong>API通过中断门进0环</strong><ul>
+<li>固定中断号为0x2E</li>
+<li>CS&#x2F;EIP由门描述符提供，ESP&#x2F;SS由TSS提供</li>
+<li>进入0环后执行的内核函数：NT!KiSystemService</li>
+</ul>
+</li>
+<li><strong>API通过sysenter指令进0环</strong><ul>
+<li>CS&#x2F;ESP&#x2F;EIP由MSR寄存器提供(SS是算出来的)</li>
+<li>进入0环后执行的内核函数：NT!KiFastCallEntry</li>
+</ul>
+</li>
+<li><strong>内核模块</strong><ul>
+<li>10-10-12分页：ntoskrnl.exe</li>
+<li>2-9-9-12分页：ntkrnlpa.exe</li>
+</ul>
+</li>
+</ol>
+<h2 id="练习"><a href="#练习" class="headerlink" title="练习"></a>练习</h2><p>要求：</p>
+<p>通过<strong>IDA</strong>找到<strong>KiSystemService</strong>和<strong>KiFastCallEntry</strong>函数并分析</p>
+<p>问题：</p>
+<ol>
+<li>进0环后，<strong>原来的寄存器</strong>存在哪里？</li>
+<li>如何根据<strong>系统调用号</strong>(eax中存储)找到要执行的内核函数？</li>
+<li>调用时<strong>参数</strong>是存储到3环的堆栈，<strong>如何传递</strong>给内核函数？</li>
+<li>2种调用方式是<strong>如何返回</strong>到3环的？</li>
+</ol>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>系统调用</tag>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+      </tags>
+  </entry>
 </search>

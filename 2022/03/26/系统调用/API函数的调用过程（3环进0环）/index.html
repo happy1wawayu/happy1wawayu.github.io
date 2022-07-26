@@ -1,0 +1,279 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"><title>API函数的调用过程（3环进0环） | wawayu's Notes</title><meta name="keywords" content="系统调用,x86,Windows内核"><meta name="author" content="wawayu"><meta name="copyright" content="wawayu"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="上一篇中分析了ReadProcessMemory函数的3环部分，它实际上没有做太多工作，只是提供了一个调用0环函数的接口，今天我们接着向下分析，看看函数是如何进入0环的。 基本概念_KUSER_SHARED_DATA 上一篇讲到了NtReadVirtualMemory这部分，调用了一个函数地址0x7FFE0300。那这个地址有什么用呢？这就要介绍一个新的结构_KUSER_SHARED_DATA：">
+<meta property="og:type" content="article">
+<meta property="og:title" content="API函数的调用过程（3环进0环）">
+<meta property="og:url" content="https://happy1wawayu.github.io/2022/03/26/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E8%BF%9B0%E7%8E%AF%EF%BC%89/index.html">
+<meta property="og:site_name" content="wawayu&#39;s Notes">
+<meta property="og:description" content="上一篇中分析了ReadProcessMemory函数的3环部分，它实际上没有做太多工作，只是提供了一个调用0环函数的接口，今天我们接着向下分析，看看函数是如何进入0环的。 基本概念_KUSER_SHARED_DATA 上一篇讲到了NtReadVirtualMemory这部分，调用了一个函数地址0x7FFE0300。那这个地址有什么用呢？这就要介绍一个新的结构_KUSER_SHARED_DATA：">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png">
+<meta property="article:published_time" content="2022-03-25T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-07-26T14:51:30.229Z">
+<meta property="article:author" content="wawayu">
+<meta property="article:tag" content="系统调用">
+<meta property="article:tag" content="x86">
+<meta property="article:tag" content="Windows内核">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://happy1wawayu.github.io/2022/03/26/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E8%BF%9B0%E7%8E%AF%EF%BC%89/"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":true,"languages":{"hits_empty":"找不到您查询的内容：${query}"}},
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  date_suffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: undefined,
+  source: {
+    justifiedGallery: {
+      js: 'https://cdn.jsdelivr.net/npm/flickr-justified-gallery/dist/fjGallery.min.js',
+      css: 'https://cdn.jsdelivr.net/npm/flickr-justified-gallery/dist/fjGallery.min.css'
+    }
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'API函数的调用过程（3环进0环）',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2022-07-26 22:51:30'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  .justified-gallery img {
+    opacity: 1
+  }
+
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+    win.saveToLocal = {
+      set: function setWithExpiry(key, value, ttl) {
+        if (ttl === 0) return
+        const now = new Date()
+        const expiryDay = ttl * 86400000
+        const item = {
+          value: value,
+          expiry: now.getTime() + expiryDay,
+        }
+        localStorage.setItem(key, JSON.stringify(item))
+      },
+
+      get: function getWithExpiry(key) {
+        const itemStr = localStorage.getItem(key)
+
+        if (!itemStr) {
+          return undefined
+        }
+        const item = JSON.parse(itemStr)
+        const now = new Date()
+
+        if (now.getTime() > item.expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return item.value
+      }
+    }
+  
+    win.getScript = url => new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = url
+      script.async = true
+      script.onerror = reject
+      script.onload = script.onreadystatechange = function() {
+        const loadState = this.readyState
+        if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+        script.onload = script.onreadystatechange = null
+        resolve()
+      }
+      document.head.appendChild(script)
+    })
+  
+      win.activateDarkMode = function () {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = function () {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          if (t === 'dark') activateDarkMode()
+          else if (t === 'light') activateLightMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+    const detectApple = () => {
+      if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+    })(window)</script><meta name="generator" content="Hexo 6.2.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="/img/avatar.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">4</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><hr/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> Link</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> About</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png')"><nav id="nav"><span id="blog_name"><a id="site-name" href="/">wawayu's Notes</a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> Archives</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> Tags</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> Categories</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> Link</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> About</span></a></div></div><div id="toggle-menu"><a class="site-page"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">API函数的调用过程（3环进0环）</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2022-03-25T16:00:00.000Z" title="发表于 2022-03-26 00:00:00">2022-03-26</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2022-07-26T14:51:30.229Z" title="更新于 2022-07-26 22:51:30">2022-07-26</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/Windows%E5%86%85%E6%A0%B8/">Windows内核</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="API函数的调用过程（3环进0环）"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><p>上一篇中分析了ReadProcessMemory函数的3环部分，它实际上没有做太多工作，只是提供了一个调用0环函数的接口，今天我们接着向下分析，看看函数是如何进入0环的。</p>
+<h2 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h2><h3 id="KUSER-SHARED-DATA"><a href="#KUSER-SHARED-DATA" class="headerlink" title="_KUSER_SHARED_DATA"></a>_KUSER_SHARED_DATA</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-26-25-e0aa1cbe699ec4228d8a655bec22b19f-nrvm-ca13f1.png"></p>
+<p>上一篇讲到了NtReadVirtualMemory这部分，调用了一个函数地址0x7FFE0300。那这个地址有什么用呢？这就要介绍一个新的结构_KUSER_SHARED_DATA：</p>
+<ol>
+<li>在User层和Kernel层分别定义了一个_KUSER_SHARED_DATA结构区域，用于User层和Kernel层共享某些数据</li>
+<li>它们使用固定的地址值映射，_KUSER_SHARED_DATA结构区域在User和Kernel层地址分别为：<ul>
+<li>User层地址为：0x7FFE0000</li>
+<li>Kernel层地址为：0xFFDF0000</li>
+</ul>
+</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-27-56-1fe10ed8bfc1a6205620f24b0f85028b-kusd-900487.png"></p>
+<p><strong>注意</strong>：虽然指向的是同一个物理页，但在User层是只读的，在Kernel层是可写的</p>
+<h3 id="SystemCall"><a href="#SystemCall" class="headerlink" title="SystemCall"></a>SystemCall</h3><p>现在我们知道，0x7FFE0000处是_KUSER_SHARED_DATA结构，使用dt指令查看结构，查找0x300偏移处，也就是0x7FFE0300的位置，这个字段是SystemCall</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-32-44-2958966e1321945bf0026aceea19d9e5-systemCall-229b7f.png"></p>
+<p>那这个SystemCall有什么用呢？</p>
+<p>SystemCall的作用是选择以什么方式进入0环。这要看CPU是否支持sysenter&#x2F;sysexit</p>
+<ul>
+<li>支持：ntdll.dll!KiFastSystemCall()</li>
+<li>不支持：ntdll.dll!KiIntSystemCall()</li>
+</ul>
+<p>那如何看CPU是否支持sysenter&#x2F;sysexit指令呢？</p>
+<ol>
+<li>（OD打开任一程序）将eax置1（参数）</li>
+<li>将ecx，edx置0（方便查看）</li>
+<li>执行指令cpuid</li>
+<li>查看edx的SEP位（下标11的位置），若值为1，说明支持sysenter&#x2F;sysexit</li>
+</ol>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-33-59-62d53dcb5ce2547ee6df9ad726b4c02c-cpuidBefore-0461cf.png"> <img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-34-05-4b3a7edeb89b88f495fd323d4162127c-cpuidAfter-d30ae8.png"></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">FBFF -&gt; 1111 1011 1111 1111  // 说明本机支持sysenter/sysexit</span><br></pre></td></tr></table></figure>
+
+<h2 id="KiIntSystemCall进0环-中断门"><a href="#KiIntSystemCall进0环-中断门" class="headerlink" title="KiIntSystemCall进0环(中断门)"></a>KiIntSystemCall进0环(中断门)</h2><p>在学过调用门，中断门后，我们知道，凡是提权（例如进0环），都伴随着寄存器中的值发生改变，包括CS，SS，EIP，ESP。所以我们分别分析一下两种进0环方式，看看他们是如何修改寄存器的值的，先从KiIntSystemCall开始。</p>
+<h3 id="获取提权后寄存器的值"><a href="#获取提权后寄存器的值" class="headerlink" title="获取提权后寄存器的值"></a>获取提权后寄存器的值</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-36-28-48500c2bc822157714751efd4d5978a9-kisc-325574.png"></p>
+<p>KiIntSystemCall进0环的方式非常简单，就是我们最熟悉中断门。（这里第一条指令的作用是<strong>获取参数的首地址</strong>）</p>
+<p>中断门就很熟悉了，进入IDT表看下0x2E对应的门描述符</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-37-30-5eef1172e8c784849e377680ce386301-0x2e-20a20e.png"></p>
+<p>根据中断门描述符，可以很快得到：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CS = 0x8 EIP = 8053e481</span><br></pre></td></tr></table></figure>
+
+<p>至于SS，和ESP，会在程序提权时，由tr寄存器指向的TSS中的ESP0和SS0提供。</p>
+<h3 id="KiSystemService"><a href="#KiSystemService" class="headerlink" title="KiSystemService"></a>KiSystemService</h3><p>根据EIP的值，0x8053e481我们可以定位到一个内核函数KiSystemService</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-38-30-52c21806a88c8797e077581859512f0e-kss-684454.png"></p>
+<p>这样就说明进入0环了，所以KiIntSystemCall进0环非常好理解，就是中断门的知识，进入0环后，就跳转到KiSystemService继续执行，至于如何找到想要执行的函数，会在后面的文章中介绍。接下来我们来看支持sysenter&#x2F;sysexit的KiFastSystemCall是如何进入0环的。</p>
+<h2 id="KiFastSystemCall进0环（快速调用）"><a href="#KiFastSystemCall进0环（快速调用）" class="headerlink" title="KiFastSystemCall进0环（快速调用）"></a>KiFastSystemCall进0环（快速调用）</h2><p>事实上，基本上现在的CPU都支持sysenter&#x2F;sysexit，默认也是通过KiFastSystemCall进0环，为什么呢？顾名思义，因为快啊。因为KiFastSystemCall不需要像中断门进0环时，去查IDT表找CS，EIP，查TSS找ESP和SS，而是直接从寄存器里读取这些数据。</p>
+<h3 id="获取提权后寄存器的值-1"><a href="#获取提权后寄存器的值-1" class="headerlink" title="获取提权后寄存器的值"></a>获取提权后寄存器的值</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-39-36-891c22733bf2b54eb808bcad3cf1da6e-kfsc-dc4a74.png"></p>
+<p>来看KiFastSystemCall，只有两行指令。sysenter指令，又称作快速调用，当CPU支持sysenter指令时，<strong>操作系统</strong>会提前将CS，SS，ESP，EIP写入到MSR寄存器中，当sysenter指令执行时，CPU直接从MSR中将这些值写入相应寄存器中，<strong>没有读取内存的过程</strong>，所以叫做快速调用。</p>
+<h4 id="MSR寄存器"><a href="#MSR寄存器" class="headerlink" title="MSR寄存器"></a>MSR寄存器</h4><p>由于MSR寄存器非常大，这里不细讲，只列出用到的值</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-40-32-52a8b2a6fcee33cdb1ed1fe470ff6a0c-msr-54f99f.png"></p>
+<p>可以通过RDMSR&#x2F;WRMST来进行读写（操作系统使用WRMST写该寄存器）</p>
+<p>这里读取ESP，EIP，CS的值（<strong>SS的值可以通过CS+8计算而得</strong>）</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-41-16-8a6ccc5cc43ecf17f9601111b0631b53-msrValue-73019a.png"></p>
+<p>这样，在进入0环时，便能通过MSR寄存器切换4个寄存器的值了</p>
+<p><strong>注意</strong>：</p>
+<ul>
+<li>在执行<strong>sysenter</strong>指令时，只有<strong>CS</strong>、<strong>ESP</strong>、<strong>EIP</strong>三个寄存器的值可从MSR寄存器中获得，<strong>其中并不包括SS！</strong></li>
+<li><code>SS</code>&#x3D; <strong>IA32_SYSENTER_CS</strong> + <strong>8</strong></li>
+<li>这些操作与<strong>操作系统</strong>无关，而是<strong>硬件</strong>（CPU）做的<code>（参考Intel白皮书第二卷）</code></li>
+</ul>
+<h3 id="KiFastCallEntry"><a href="#KiFastCallEntry" class="headerlink" title="KiFastCallEntry"></a>KiFastCallEntry</h3><p>前面讲了KiIntSystemCall进入0环后执行KiSystemService，KiFastSystemCall当然也有，执行的是另一个函数，通过MSR得到的EIP我们可以找到函数KiFastCallEntry，同样是内核函数。</p>
+<p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-26-22-43-35-42c332e010267abcb3471aa2284abfc0-kfce-0e98b3.png"></p>
+<p>这样便成功进入0环了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>进0环的过程非常好理解，一种是咱们熟悉的中断门，另一种快速调用。</p>
+<ol>
+<li><strong>API通过中断门进0环</strong><ul>
+<li>固定中断号为0x2E</li>
+<li>CS&#x2F;EIP由门描述符提供，ESP&#x2F;SS由TSS提供</li>
+<li>进入0环后执行的内核函数：NT!KiSystemService</li>
+</ul>
+</li>
+<li><strong>API通过sysenter指令进0环</strong><ul>
+<li>CS&#x2F;ESP&#x2F;EIP由MSR寄存器提供(SS是算出来的)</li>
+<li>进入0环后执行的内核函数：NT!KiFastCallEntry</li>
+</ul>
+</li>
+<li><strong>内核模块</strong><ul>
+<li>10-10-12分页：ntoskrnl.exe</li>
+<li>2-9-9-12分页：ntkrnlpa.exe</li>
+</ul>
+</li>
+</ol>
+<h2 id="练习"><a href="#练习" class="headerlink" title="练习"></a>练习</h2><p>要求：</p>
+<p>通过<strong>IDA</strong>找到<strong>KiSystemService</strong>和<strong>KiFastCallEntry</strong>函数并分析</p>
+<p>问题：</p>
+<ol>
+<li>进0环后，<strong>原来的寄存器</strong>存在哪里？</li>
+<li>如何根据<strong>系统调用号</strong>(eax中存储)找到要执行的内核函数？</li>
+<li>调用时<strong>参数</strong>是存储到3环的堆栈，<strong>如何传递</strong>给内核函数？</li>
+<li>2种调用方式是<strong>如何返回</strong>到3环的？</li>
+</ol>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://happy1wawayu.github.io">wawayu</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://happy1wawayu.github.io/2022/03/26/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E8%BF%9B0%E7%8E%AF%EF%BC%89/">https://happy1wawayu.github.io/2022/03/26/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E8%BF%9B0%E7%8E%AF%EF%BC%89/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://happy1wawayu.github.io" target="_blank">wawayu's Notes</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/">系统调用</a><a class="post-meta__tags" href="/tags/x86/">x86</a><a class="post-meta__tags" href="/tags/Windows%E5%86%85%E6%A0%B8/">Windows内核</a></div><div class="post_share"><div class="social-share" data-image="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="next-post pull-full"><a href="/2022/03/25/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/"><img class="next-cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">API函数的调用过程（3环部分）</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/2022/03/25/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/" title="API函数的调用过程（3环部分）"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-25</div><div class="title">API函数的调用过程（3环部分）</div></div></a></div><div><a href="/2022/03/18/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/10-10-12%E5%88%86%E9%A1%B5/" title="10-10-12分页"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-18</div><div class="title">10-10-12分页</div></div></a></div><div><a href="/2022/03/22/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/2-9-9-12%E5%88%86%E9%A1%B5/" title="2-9-9-12分页"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-22</div><div class="title">2-9-9-12分页</div></div></a></div><div><a href="/2022/03/19/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/PDE_PTE%E5%B1%9E%E6%80%A7/" title="PDE_PTE属性（部分）"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-19</div><div class="title">PDE_PTE属性（部分）</div></div></a></div><div><a href="/2022/03/23/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/TLB&%E6%8E%A7%E5%88%B6%E5%AF%84%E5%AD%98%E5%99%A8/" title="TLB&amp;控制寄存器"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-23</div><div class="title">TLB&amp;控制寄存器</div></div></a></div><div><a href="/2022/03/24/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/" title="中断与异常"><img class="cover" src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" alt="cover"><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2022-03-24</div><div class="title">中断与异常</div></div></a></div></div></div><hr/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div id="gitalk-container"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="/img/avatar.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">wawayu</div><div class="author-info__description"></div></div><div class="card-info-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">12</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">4</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/happy1wawayu"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/happy1wawayu" target="_blank" title="Github"><i class="fab fa-github"></i></a><a class="social-icon" href="mailto:wawayu94@gmail.com" target="_blank" title="Email"><i class="fas fa-envelope"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">Welcome!</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5"><span class="toc-number">1.</span> <span class="toc-text">基本概念</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#KUSER-SHARED-DATA"><span class="toc-number">1.1.</span> <span class="toc-text">_KUSER_SHARED_DATA</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#SystemCall"><span class="toc-number">1.2.</span> <span class="toc-text">SystemCall</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#KiIntSystemCall%E8%BF%9B0%E7%8E%AF-%E4%B8%AD%E6%96%AD%E9%97%A8"><span class="toc-number">2.</span> <span class="toc-text">KiIntSystemCall进0环(中断门)</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%8E%B7%E5%8F%96%E6%8F%90%E6%9D%83%E5%90%8E%E5%AF%84%E5%AD%98%E5%99%A8%E7%9A%84%E5%80%BC"><span class="toc-number">2.1.</span> <span class="toc-text">获取提权后寄存器的值</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#KiSystemService"><span class="toc-number">2.2.</span> <span class="toc-text">KiSystemService</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#KiFastSystemCall%E8%BF%9B0%E7%8E%AF%EF%BC%88%E5%BF%AB%E9%80%9F%E8%B0%83%E7%94%A8%EF%BC%89"><span class="toc-number">3.</span> <span class="toc-text">KiFastSystemCall进0环（快速调用）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%8E%B7%E5%8F%96%E6%8F%90%E6%9D%83%E5%90%8E%E5%AF%84%E5%AD%98%E5%99%A8%E7%9A%84%E5%80%BC-1"><span class="toc-number">3.1.</span> <span class="toc-text">获取提权后寄存器的值</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#MSR%E5%AF%84%E5%AD%98%E5%99%A8"><span class="toc-number">3.1.1.</span> <span class="toc-text">MSR寄存器</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#KiFastCallEntry"><span class="toc-number">3.2.</span> <span class="toc-text">KiFastCallEntry</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">4.</span> <span class="toc-text">总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%83%E4%B9%A0"><span class="toc-number">5.</span> <span class="toc-text">练习</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/2022/03/26/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E8%BF%9B0%E7%8E%AF%EF%BC%89/" title="API函数的调用过程（3环进0环）"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="API函数的调用过程（3环进0环）"/></a><div class="content"><a class="title" href="/2022/03/26/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E8%BF%9B0%E7%8E%AF%EF%BC%89/" title="API函数的调用过程（3环进0环）">API函数的调用过程（3环进0环）</a><time datetime="2022-03-25T16:00:00.000Z" title="发表于 2022-03-26 00:00:00">2022-03-26</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2022/03/25/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/" title="API函数的调用过程（3环部分）"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="API函数的调用过程（3环部分）"/></a><div class="content"><a class="title" href="/2022/03/25/%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%883%E7%8E%AF%E9%83%A8%E5%88%86%EF%BC%89/" title="API函数的调用过程（3环部分）">API函数的调用过程（3环部分）</a><time datetime="2022-03-24T16:00:00.000Z" title="发表于 2022-03-25 00:00:00">2022-03-25</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2022/03/24/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/" title="中断与异常"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="中断与异常"/></a><div class="content"><a class="title" href="/2022/03/24/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E4%B8%AD%E6%96%AD%E4%B8%8E%E5%BC%82%E5%B8%B8/" title="中断与异常">中断与异常</a><time datetime="2022-03-23T16:00:00.000Z" title="发表于 2022-03-24 00:00:00">2022-03-24</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2022/03/23/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/TLB&amp;%E6%8E%A7%E5%88%B6%E5%AF%84%E5%AD%98%E5%99%A8/" title="TLB&amp;控制寄存器"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="TLB&amp;控制寄存器"/></a><div class="content"><a class="title" href="/2022/03/23/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/TLB&amp;%E6%8E%A7%E5%88%B6%E5%AF%84%E5%AD%98%E5%99%A8/" title="TLB&amp;控制寄存器">TLB&amp;控制寄存器</a><time datetime="2022-03-22T16:00:00.000Z" title="发表于 2022-03-23 00:00:00">2022-03-23</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2022/03/22/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/2-9-9-12%E5%88%86%E9%A1%B5/" title="2-9-9-12分页"><img src="https://fastly.jsdelivr.net/gh/jerryc127/CDN@latest/cover/default_bg.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="2-9-9-12分页"/></a><div class="content"><a class="title" href="/2022/03/22/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/2-9-9-12%E5%88%86%E9%A1%B5/" title="2-9-9-12分页">2-9-9-12分页</a><time datetime="2022-03-21T16:00:00.000Z" title="发表于 2022-03-22 00:00:00">2022-03-22</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2020 - 2022 By wawayu</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside_config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><i class="fas fa-arrow-up"></i></button></div></div><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><span id="loading-status"></span><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="is-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据库加载中</span></div><div class="search-wrap"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div><hr/><div id="local-search-results"></div></div></div><div id="search-mask"></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.umd.min.js"></script><script src="/js/search/local-search.js"></script><div class="js-pjax"><script>function addGitalkSource () {
+  const ele = document.createElement('link')
+  ele.rel = 'stylesheet'
+  ele.href= 'https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.css'
+  document.getElementsByTagName('head')[0].appendChild(ele)
+}
+
+function loadGitalk () {
+  function initGitalk () {
+    var gitalk = new Gitalk(Object.assign({
+      clientID: '078086393b3fd0aec773',
+      clientSecret: '4dbd3012837c510a449de8da8ae0716a5877f0af',
+      repo: 'happy1wawayu.github.io',
+      owner: 'happy1wawayu',
+      admin: ['happy1wawayu'],
+      id: '3195d0690583ac212d5e54cbeac8fbd5',
+      updateCountCallback: commentCount
+    },null))
+
+    gitalk.render('gitalk-container')
+  }
+
+  if (typeof Gitalk === 'function') initGitalk()
+  else {
+    addGitalkSource()
+    getScript('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.js').then(initGitalk)
+  }
+}
+
+function commentCount(n){
+  let isCommentCount = document.querySelector('#post-meta .gitalk-comment-count')
+  if (isCommentCount) {
+    isCommentCount.innerHTML= n
+  }
+}
+
+if ('Gitalk' === 'Gitalk' || !false) {
+  if (false) btf.loadComment(document.getElementById('gitalk-container'), loadGitalk)
+  else loadGitalk()
+} else {
+  function loadOtherComment () {
+    loadGitalk()
+  }
+}</script></div><script defer="defer" id="ribbon" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/canvas-ribbon.min.js" size="150" alpha="0.6" zIndex="-1" mobile="false" data-click="false"></script><script id="click-heart" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/dist/click-heart.min.js" async="async" mobile="false"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
