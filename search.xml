@@ -1019,17 +1019,25 @@
 
 <p>继续分析这一部分</p>
 <ol>
-<li>我们来看前3行，它做了什么事呢，先取出_Trap_Frame 0x6C偏移处的值，即进入中断门前，程序CS的值，然后和1进行了与运算，并将bl的值，填入上面提到的先前模式 [<img src="https://cataloc.gitee.io/blog/2020/03/26/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%88%E4%BF%9D%E5%AD%98%E7%8E%B0%E5%9C%BA%EF%BC%89/0x3_1.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/26/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%88%E4%BF%9D%E5%AD%98%E7%8E%B0%E5%9C%BA%EF%BC%89/0x3_1.png)"> 为什么和1进行与运算就可以算出先前模式呢？难道不直接填3吗？首先我们知道，Windows只用了0环和3环，其次，<strong>即使执行中断门，执行前的程序也可以是0环程序</strong>，所以保守起见，这里和CPL的最低位进行与运算；若结果为1，说明是3环程序执行了中断门，若为0，说明是0环程序执行的中断门。从而算出先前模式，并填入到<strong>当前线程KTHREAD</strong>的先前模式字段中。</li>
-<li>上面3行更新了先前模式，接下来4行的作用就是<strong>更新了_Trap_Frame</strong>，我们知道栈顶指向Trap_Frame的首地址，现在让栈底也指向Trap_Frame的首地址，便于寻址。 [<img src="https://cataloc.gitee.io/blog/2020/03/26/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%88%E4%BF%9D%E5%AD%98%E7%8E%B0%E5%9C%BA%EF%BC%89/0x3_2.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/26/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%88%E4%BF%9D%E5%AD%98%E7%8E%B0%E5%9C%BA%EF%BC%89/0x3_2.png)"> 由0x2的分析可知esi指向KTHREAD，<strong>KTHREAD+0x134则指向Trap_Frame</strong>，这里的Trap_Frame是旧的地址（这里则是Null），因此将它保存至堆栈，再将现在的Trap_Frame的地址写入，也就完成了更新。</li>
-<li>cld指令修改了EFLAGS寄存器的DF位</li>
+<li><p>我们来看前3行，它做了什么事呢，先取出_Trap_Frame 0x6C偏移处的值，即进入中断门前，程序CS的值，然后和1进行了与运算，并将bl的值，填入上面提到的先前模式 <img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-29-21-38-26-e5f0d0c072377e43ec10703967a74a9e-0x3_1-505138.png"> </p>
+<p>为什么和1进行与运算就可以算出先前模式呢？难道不直接填3吗？首先我们知道，Windows只用了0环和3环，其次，<strong>即使执行中断门，执行前的程序也可以是0环程序</strong>，所以保守起见，这里和CPL的最低位进行与运算；若结果为1，说明是3环程序执行了中断门，若为0，说明是0环程序执行的中断门。从而算出先前模式，并填入到<strong>当前线程KTHREAD</strong>的先前模式字段中。</p>
+</li>
+<li><p>上面3行更新了先前模式，接下来4行的作用就是<strong>更新了_Trap_Frame</strong>，我们知道栈顶指向Trap_Frame的首地址，现在让栈底也指向Trap_Frame的首地址，便于寻址。 <img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-29-21-39-06-7a7264d22fee5e44b58f9f752491fe20-0x3_2-c29f7f.png"> 由0x2的分析可知esi指向KTHREAD，<strong>KTHREAD+0x134则指向Trap_Frame</strong>，这里的Trap_Frame是旧的地址（这里则是Null)，因此将它保存至堆栈，再将现在的Trap_Frame的地址写入，也就完成了更新。</p>
+</li>
+<li><p>cld指令修改了EFLAGS寄存器的DF位</p>
+</li>
 </ol>
 <h3 id="0x4"><a href="#0x4" class="headerlink" title="0x4"></a>0x4</h3><figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">804df67e 8b5d60          mov     ebx,dword ptr [ebp+60h]	//取3环的ebp给ebx</span><br><span class="line">804df681 8b7d68          mov     edi,dword ptr [ebp+68h]	//取3环的eip给edi</span><br><span class="line">804df684 89550c          mov     dword ptr [ebp+0Ch],edx	//edx存的是3环第一个参数的地址，赋到_Trap_Frame的DbgArgPointer的位置</span><br><span class="line">804df687 c74508000ddbba  mov     dword ptr [ebp+8],0BADB0D00h	//将操作系统用的标志赋给DbgArgMark</span><br><span class="line">804df68e 895d00          mov     dword ptr [ebp],ebx		//将3环的ebp赋值到DbgEbp</span><br><span class="line">804df691 897d04          mov     dword ptr [ebp+4],edi		//将3环的eip赋值到DbgEip</span><br><span class="line">804df694 f6462cff        test    byte ptr [esi+2Ch],0FFh	//判断DebugActive处的值是否为-1</span><br><span class="line">804df698 0f858efeffff    jne     nt!Dr_kss_a (804df52c)		//跳转至调试寄存器保存函数</span><br><span class="line">804df69e fb              sti</span><br><span class="line">804df69f e9dd000000      jmp     nt!KiFastCallEntry+0x8d (804df781)</span><br></pre></td></tr></table></figure>
 
 <p>来看最后一部分</p>
 <ol>
-<li>前6行，很好理解，主要是对_Trap_Frame调试部分的填充，一张图就可以概括[<img src="https://cataloc.gitee.io/blog/2020/03/26/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%88%E4%BF%9D%E5%AD%98%E7%8E%B0%E5%9C%BA%EF%BC%89/0x4_1.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/26/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%88%E4%BF%9D%E5%AD%98%E7%8E%B0%E5%9C%BA%EF%BC%89/0x4_1.png)"></li>
-<li>接下来的两行，会比较esi+0x2C的位置是否为-1 [<img src="https://cataloc.gitee.io/blog/2020/03/26/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%88%E4%BF%9D%E5%AD%98%E7%8E%B0%E5%9C%BA%EF%BC%89/0x4_2.png" alt="[]](https://cataloc.gitee.io/blog/2020/03/26/API%E5%87%BD%E6%95%B0%E7%9A%84%E8%B0%83%E7%94%A8%E8%BF%87%E7%A8%8B%EF%BC%88%E4%BF%9D%E5%AD%98%E7%8E%B0%E5%9C%BA%EF%BC%89/0x4_2.png)"> 这个地方值如果不是-1，说明处于调试状态，紧接着会跳转到Dr_kss_a这个例程里，这个例程作用是将Dr0~Dr7这些调试寄存器的值保存到_Trap_Frame中，用于调试。同样的，了解了这个字段后，我们可以写一个程序，不断的修改这个值，将DebugActive这个值置为-1，这样程序就不会保存调试寄存器，也就无法调试，这是一种反调试的手段。</li>
-<li>最后，程序会跳转到<strong>KiFastCallEntry+0x8D</strong>这个位置继续执行，而这个位置，也是KiFastCallEntry执行完后跳转的地方。之所以分了两种方式，是因为中断门进0环时，压栈了5个值（ESP，EIP，CS，SS，EFLAGS）而快速调用没有，导致它们在<strong>填写_Trap_Frame结构的方式不同</strong>，但是在填完后，保存现场以后，后面执行的函数就一样了。</li>
+<li><p>前6行，很好理解，主要是对_Trap_Frame调试部分的填充，一张图就可以概括<img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-28-22-31-48-88c708b22fd34dbe46489f2286ebc8a2-0x4_1-9530ea.png"></p>
+</li>
+<li><p>接下来的两行，会比较esi+0x2C的位置是否为-1 <img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-07-28-22-32-04-5544cb85afa08930cccdf632e669d4b1-0x4_2-506f4d.png"> </p>
+<p>这个地方值如果不是-1，说明处于调试状态，紧接着会跳转到Dr_kss_a这个例程里，这个例程作用是将Dr0~Dr7这些调试寄存器的值保存到_Trap_Frame中，用于调试。同样的，了解了这个字段后，我们可以写一个程序，不断的修改这个值，将DebugActive这个值置为-1，这样程序就不会保存调试寄存器，也就无法调试，这是一种反调试的手段。</p>
+</li>
+<li><p>最后，程序会跳转到<strong>KiFastCallEntry+0x8D</strong>这个位置继续执行，而这个位置，也是KiFastCallEntry执行完后跳转的地方。之所以分了两种方式，是因为中断门进0环时，压栈了5个值（ESP，EIP，CS，SS，EFLAGS）而快速调用没有，导致它们在<strong>填写_Trap_Frame结构的方式不同</strong>，但是在填完后，保存现场以后，后面执行的函数就一样了。</p>
+</li>
 </ol>
 <h2 id="KiFastCallEntry"><a href="#KiFastCallEntry" class="headerlink" title="KiFastCallEntry"></a>KiFastCallEntry</h2><p>KiFastCallEntry保存现场的方式略微发杂，因为没有通过中断门对3环的5个寄存器进行压栈。由于分析的代码较多，这部分就不贴图了，可以参照KiSystemService的方法，在Windbg中找到对应结构进行分析。</p>
 <p>KiFastCallEntry要分为两个部分来看，第一个部分，是和KiSystemService所做的一样，对_Trap_Frame结构的填充，进行保存现场。完了之后，第二个部分，从<strong>KiFastCallEntry+0x8D</strong>开始，这是KiSystemService执行完后跳转的地方，也是KiFastCallEntry顺序执行的地方，是双方都要执行的代码，这也意味着，从这个地方开始，两种进0环的方式就统一了。</p>
