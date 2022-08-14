@@ -1252,7 +1252,7 @@
 <h2 id="示例代码"><a href="#示例代码" class="headerlink" title="示例代码"></a>示例代码</h2><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> </span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> </span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> MAXGMTHREAD 0x100</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> GMTHREADSTACKSIZE 0x80000</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> GMTHREAD_CREATE 0x1</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> GMTHREAD_READY 0x2</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> GMTHREAD_RUNING 0x4</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> GMTHREAD_SLEEP 0x8</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> GMTHREAD_EXIT 0x100</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> _SELF abcd1234</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>					//定义线程结构体</span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">	<span class="type">char</span>* name;				<span class="comment">//线程名</span></span><br><span class="line">	<span class="type">int</span> Flags;				<span class="comment">//定义状态：Ready/Sleep/Running</span></span><br><span class="line">	<span class="type">int</span> SleepMillisecondDot;		<span class="comment">//休眠时间</span></span><br><span class="line"></span><br><span class="line">	<span class="type">void</span>* InitialStack;			<span class="comment">//栈底</span></span><br><span class="line">	<span class="type">void</span>* StackLimit;			<span class="comment">//栈限长</span></span><br><span class="line">	<span class="type">void</span>* KernelStack;			<span class="comment">//栈顶</span></span><br><span class="line"></span><br><span class="line">	<span class="type">void</span> *lpParameter;			<span class="comment">//线程函数参数</span></span><br><span class="line">	<span class="type">void</span> (*func)(<span class="type">void</span> *lpParameter);	<span class="comment">//线程函数</span></span><br><span class="line">&#125;GMThread_t;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span>  CurrentThreadIndex = <span class="number">0</span>;</span><br><span class="line"><span class="type">void</span>* WindowsStackLimit = <span class="literal">NULL</span>;</span><br><span class="line">GMThread_t GMThreadList[MAXGMTHREAD] = &#123;<span class="literal">NULL</span>, <span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">PushStack</span><span class="params">(<span class="type">unsigned</span> <span class="type">int</span>** Stackpp, <span class="type">unsigned</span> <span class="type">int</span> v)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">RegisterGMThread</span><span class="params">(<span class="type">char</span>* name, <span class="type">void</span> (*func)(<span class="type">void</span>* lpParameter), <span class="type">void</span>* lpParameter)</span>;	</span><br><span class="line"><span class="type">void</span> <span class="title function_">InitGMThread</span><span class="params">(GMThread_t* GMThreadp, <span class="type">char</span>* name, <span class="type">void</span> (*func)(<span class="type">void</span>* lpParameter), <span class="type">void</span> * lpParameter)</span>;	</span><br><span class="line"><span class="type">void</span> <span class="title function_">GMThreadStartup</span><span class="params">(GMThread_t* GMThreadp)</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">Scheduling</span><span class="params">(<span class="type">void</span>)</span>;				</span><br><span class="line"><span class="type">void</span> <span class="title function_">SwitchContext</span><span class="params">(GMThread_t* SrcGMThreadp, GMThread_t* DstGMThreadp)</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">GMSleep</span><span class="params">(<span class="type">int</span> Milliseconds)</span>;			</span><br><span class="line"><span class="type">void</span> <span class="title function_">Thread1</span><span class="params">(<span class="type">void</span>* lpParameter)</span>;		</span><br><span class="line"><span class="type">void</span> <span class="title function_">Thread2</span><span class="params">(<span class="type">void</span>* lpParameter)</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">Thread3</span><span class="params">(<span class="type">void</span>* lpParameter)</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">Thread4</span><span class="params">(<span class="type">void</span>* lpParameter)</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span></span><br><span class="line">&#123;</span><br><span class="line">	RegisterGMThread(<span class="string">&quot;Thread1&quot;</span>, Thread1, <span class="literal">NULL</span>);		</span><br><span class="line">	RegisterGMThread(<span class="string">&quot;Thread2&quot;</span>, Thread2, <span class="literal">NULL</span>);</span><br><span class="line">	RegisterGMThread(<span class="string">&quot;Thread3&quot;</span>, Thread3, <span class="literal">NULL</span>);</span><br><span class="line">	RegisterGMThread(<span class="string">&quot;Thread4&quot;</span>, Thread4, <span class="literal">NULL</span>);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		Sleep(<span class="number">20</span>);	</span><br><span class="line">		Scheduling();	</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//向栈中压入值</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">PushStack</span><span class="params">(<span class="type">unsigned</span> <span class="type">int</span>** Stackpp, <span class="type">unsigned</span> <span class="type">int</span> v)</span>	</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// ESP 减去一个单位（4个字节）</span></span><br><span class="line">	*Stackpp -= <span class="number">1</span>;		</span><br><span class="line">	**Stackpp = v;		</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//将一个函数注册为单独线程执行</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">RegisterGMThread</span><span class="params">(<span class="type">char</span>* name, <span class="type">void</span> (*func)(<span class="type">void</span>* lpParameter), <span class="type">void</span>* lpParameter)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> i = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">for</span> (i=<span class="number">1</span>; GMThreadList[i].name; i++)</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="keyword">if</span> (<span class="number">0</span> == <span class="built_in">strcmp</span>(GMThreadList[i].name, name))	</span><br><span class="line">		&#123;</span><br><span class="line">			<span class="keyword">break</span>;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	InitGMThread(&amp;GMThreadList[i], name, func, lpParameter);	</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> i;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//初始化线程的信息</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">InitGMThread</span><span class="params">(GMThread_t* GMThreadp, <span class="type">char</span>* name, <span class="type">void</span> (*func)(<span class="type">void</span>* lpParameter), <span class="type">void</span> * lpParameter)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">char</span>* StackPages;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span>* StackDWORDParam;</span><br><span class="line"></span><br><span class="line">	GMThreadp-&gt;Flags = GMTHREAD_CREATE;		</span><br><span class="line"></span><br><span class="line">	GMThreadp-&gt;name = name;				</span><br><span class="line">	GMThreadp-&gt;func = func;</span><br><span class="line">	GMThreadp-&gt;lpParameter = lpParameter;</span><br><span class="line"></span><br><span class="line">	StackPages = (<span class="type">unsigned</span> <span class="type">char</span>*)VirtualAlloc(<span class="literal">NULL</span>, GMTHREADSTACKSIZE, MEM_COMMIT, PAGE_READWRITE);	</span><br><span class="line">	</span><br><span class="line">	<span class="built_in">memset</span>(StackPages, <span class="literal">NULL</span>, GMTHREADSTACKSIZE);	</span><br><span class="line"></span><br><span class="line">	GMThreadp-&gt;InitialStack = StackPages + GMTHREADSTACKSIZE;	</span><br><span class="line"></span><br><span class="line">	GMThreadp-&gt;StackLimit = StackPages;		</span><br><span class="line"></span><br><span class="line">	StackDWORDParam = (<span class="type">unsigned</span> <span class="type">int</span>*)GMThreadp-&gt;InitialStack;	</span><br><span class="line"></span><br><span class="line">	PushStack(&amp;StackDWORDParam, (<span class="type">unsigned</span> <span class="type">int</span>)GMThreadp);		</span><br><span class="line">	PushStack(&amp;StackDWORDParam, (<span class="type">unsigned</span> <span class="type">int</span>)<span class="number">9</span>);	</span><br><span class="line">	PushStack(&amp;StackDWORDParam, (<span class="type">unsigned</span> <span class="type">int</span>)GMThreadStartup);	</span><br><span class="line">	PushStack(&amp;StackDWORDParam, <span class="number">5</span>);	</span><br><span class="line">	PushStack(&amp;StackDWORDParam, <span class="number">7</span>);	</span><br><span class="line">	PushStack(&amp;StackDWORDParam, <span class="number">6</span>);</span><br><span class="line">	PushStack(&amp;StackDWORDParam, <span class="number">3</span>);	</span><br><span class="line">	PushStack(&amp;StackDWORDParam, <span class="number">2</span>);	</span><br><span class="line">	PushStack(&amp;StackDWORDParam, <span class="number">1</span>);	</span><br><span class="line">	PushStack(&amp;StackDWORDParam, <span class="number">0</span>);	</span><br><span class="line">	</span><br><span class="line">	GMThreadp-&gt;KernelStack = StackDWORDParam;	</span><br><span class="line"></span><br><span class="line">	GMThreadp-&gt;Flags = GMTHREAD_READY;	</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//启动线程的函数</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">GMThreadStartup</span><span class="params">(GMThread_t* GMThreadp)</span></span><br><span class="line">&#123;</span><br><span class="line">	GMThreadp-&gt;func(GMThreadp-&gt;lpParameter);	</span><br><span class="line">	GMThreadp-&gt;Flags = GMTHREAD_EXIT;	</span><br><span class="line">	</span><br><span class="line">	Scheduling();</span><br><span class="line">	</span><br><span class="line">	<span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//线程调度函数，这个函数使得当前线程让出CPU，从队列里重新选择一个线程执行</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">Scheduling</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> i;</span><br><span class="line">	<span class="type">int</span> TickCount;</span><br><span class="line">	GMThread_t* SrcGMThreadp;	</span><br><span class="line">	GMThread_t* DstGMThreadp;	</span><br><span class="line">    </span><br><span class="line">	TickCount = GetTickCount();	</span><br><span class="line"></span><br><span class="line">	SrcGMThreadp = &amp;GMThreadList[CurrentThreadIndex];	</span><br><span class="line">	DstGMThreadp = &amp;GMThreadList[<span class="number">0</span>];</span><br><span class="line"></span><br><span class="line">	<span class="keyword">for</span> (i=<span class="number">1</span>; GMThreadList[i].name; i++)	</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="keyword">if</span> (GMThreadList[i].Flags &amp; GMTHREAD_SLEEP)		</span><br><span class="line">		&#123;</span><br><span class="line">			<span class="keyword">if</span> (TickCount &gt; GMThreadList[i].SleepMillisecondDot)	</span><br><span class="line">			&#123;</span><br><span class="line">				GMThreadList[i].Flags = GMTHREAD_READY;	</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="keyword">if</span> (GMThreadList[i].Flags &amp; GMTHREAD_READY)	</span><br><span class="line">		&#123;</span><br><span class="line">			DstGMThreadp = &amp;GMThreadList[i];	</span><br><span class="line">			<span class="keyword">break</span>;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	CurrentThreadIndex = DstGMThreadp - GMThreadList;	</span><br><span class="line">	SwitchContext(SrcGMThreadp, DstGMThreadp);	</span><br><span class="line">	</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//切换线程</span></span><br><span class="line">__declspec(naked) <span class="type">void</span> <span class="title function_">SwitchContext</span><span class="params">(GMThread_t* SrcGMThreadp, GMThread_t* DstGMThreadp)</span>	</span><br><span class="line">&#123;</span><br><span class="line">	__asm</span><br><span class="line">	&#123;</span><br><span class="line">		push ebp</span><br><span class="line">		mov ebp, esp</span><br><span class="line"></span><br><span class="line">		push edi	</span><br><span class="line">		push esi</span><br><span class="line">		push ebx</span><br><span class="line">		push ecx</span><br><span class="line">		push edx</span><br><span class="line">		push eax	</span><br><span class="line">		</span><br><span class="line">		mov esi, SrcGMThreadp	</span><br><span class="line">		mov edi, DstGMThreadp</span><br><span class="line"></span><br><span class="line">		mov [esi + GMThread_t.KernelStack], esp	</span><br><span class="line">		<span class="comment">//经典线程切换的实现，本质就是切换堆栈</span></span><br><span class="line">		mov esp, [edi + GMThread_t.KernelStack]	</span><br><span class="line"></span><br><span class="line">		pop eax		</span><br><span class="line">		pop edx</span><br><span class="line">		pop ecx</span><br><span class="line">		pop ebx</span><br><span class="line">		pop esi</span><br><span class="line">		pop edi</span><br><span class="line">		</span><br><span class="line">		pop ebp</span><br><span class="line">		ret</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">GMSleep</span><span class="params">(<span class="type">int</span> Milliseconds)</span></span><br><span class="line">&#123;</span><br><span class="line">	GMThread_t* GMThreadp;</span><br><span class="line">	GMThreadp = &amp;GMThreadList[CurrentThreadIndex];</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (GMThreadp-&gt;Flags != <span class="number">0</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		GMThreadp-&gt;SleepMillisecondDot = GetTickCount() + Milliseconds;</span><br><span class="line">		GMThreadp-&gt;Flags = GMTHREAD_SLEEP;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	Scheduling();</span><br><span class="line">	<span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">Thread1</span><span class="params">(<span class="type">void</span>* lpParameter)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="built_in">printf</span>(<span class="string">&quot;Thread1\n&quot;</span>);</span><br><span class="line">		GMSleep(<span class="number">500</span>);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">Thread2</span><span class="params">(<span class="type">void</span>* lpParameter)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="built_in">printf</span>(<span class="string">&quot;Thread2\n&quot;</span>);</span><br><span class="line">		GMSleep(<span class="number">200</span>);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">Thread3</span><span class="params">(<span class="type">void</span>* lpParameter)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="built_in">printf</span>(<span class="string">&quot;Thread3\n&quot;</span>);</span><br><span class="line">		GMSleep(<span class="number">10</span>);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">Thread4</span><span class="params">(<span class="type">void</span>* lpParameter)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">while</span>(<span class="number">1</span>)</span><br><span class="line">	&#123;</span><br><span class="line">		<span class="built_in">printf</span>(<span class="string">&quot;Thread4\n&quot;</span>);</span><br><span class="line">		GMSleep(<span class="number">1000</span>);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
 <h2 id="代码分析"><a href="#代码分析" class="headerlink" title="代码分析"></a>代码分析</h2><p>上述代码较长，且每行长短不一，故注释较乱，这里进行一些简要分析</p>
-<h3 id="模拟线程结构体"><a href="#模拟线程结构体" class="headerlink" title="模拟线程结构体"></a>模拟线程结构体</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>					//定义线程结构体</span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">	<span class="type">char</span>* name;</span><br><span class="line">	<span class="type">int</span> Flags;				<span class="comment">//定义状态：Ready/Sleep/Running</span></span><br><span class="line">	<span class="type">int</span> SleepMillisecondDot;		<span class="comment">//线程等待时间</span></span><br><span class="line"></span><br><span class="line">	<span class="type">void</span>* InitialStack;			<span class="comment">//栈底</span></span><br><span class="line">	<span class="type">void</span>* StackLimit;			<span class="comment">//栈限长</span></span><br><span class="line">	<span class="type">void</span>* KernelStack;			<span class="comment">//栈顶</span></span><br><span class="line"></span><br><span class="line">	<span class="type">void</span> *lpParameter;			<span class="comment">//线程函数参数</span></span><br><span class="line">	<span class="type">void</span> (*func)(<span class="type">void</span> *lpParameter);	<span class="comment">//线程函数</span></span><br><span class="line">&#125;GMThread_t;</span><br></pre></td></tr></table></figure>
+<h3 id="模拟线程结构体"><a href="#模拟线程结构体" class="headerlink" title="模拟线程结构体"></a>模拟线程结构体</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>					//定义线程结构体</span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">	<span class="type">char</span>* name;</span><br><span class="line">	<span class="type">int</span> Flags;				<span class="comment">//定义状态：Ready/Sleep/Running</span></span><br><span class="line">	<span class="type">int</span> SleepMillisecondDot;		<span class="comment">//线程等待时间</span></span><br><span class="line"></span><br><span class="line">	<span class="type">void</span>* InitialStack;			<span class="comment">//栈底</span></span><br><span class="line">	<span class="type">void</span>* StackLimit;			<span class="comment">//栈限长</span></span><br><span class="line">	<span class="type">void</span>* KernelStack;			<span class="comment">//栈顶</span></span><br><span class="line"></span><br><span class="line">	<span class="type">void</span> *lpParameter;			<span class="comment">//线程函数参数</span></span><br><span class="line">	<span class="type">void</span> (*func)(<span class="type">void</span> *lpParameter);	<span class="comment">//线程函数</span></span><br><span class="line">&#125; GMThread_t;</span><br></pre></td></tr></table></figure>
 
 <p>这是这份代码里<strong>最重要的结构体</strong>，它定义了我们模拟线程的结构，实际上，就是一个<strong>乞丐版的ETHREAD</strong>，只是很多ETHREAD中的成员我们用不到，就省去了，但仍然可以模拟线程切换的过程，这也算是个五脏俱全的线程结构体，我们来看看都有哪些成员吧：</p>
 <ul>
@@ -1766,6 +1766,348 @@
 <ol start="6">
 <li>说明任务管理器是通过<strong>遍历活动进程链表来查询所有进程的</strong></li>
 </ol>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>进程与线程</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>分析SwapContext</title>
+    <url>/2022/04/05/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E5%88%86%E6%9E%90SwapContext/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>SwapContext这个函数是Windows线程切换的核心，无论是<strong>主动切换</strong>还是<strong>系统时钟导致的线程切换</strong>，最终都会调用这个函数。在这个函数中，除了切换堆栈以外，还做了一些其它事情，了解这些细节对我们学习操作系统至关重要。</p>
+<h2 id="遗留问题"><a href="#遗留问题" class="headerlink" title="遗留问题"></a>遗留问题</h2><p>在分析SwapContext函数之前，来回顾两个之前的文章中并没有交代的问题：</p>
+<ul>
+<li><p>我们知道，在程序从3环进入0环时，会发生<strong>权限的切换</strong>，这就<strong>意味着堆栈发生了切换</strong>，也必然，<strong>线程发生了切换</strong>。之前学习过，3环进入0环，有两种方式，分别是中断门进0环以及快速调用。这里我们来简单的回顾一下：</p>
+<ul>
+<li>通过中断门进0环时，会<strong>从TSS中获取到esp0</strong>的值。</li>
+<li>快速调用进入0环时，则是从MSR寄存器中获取esp0的值，但是实际情况是，在分析快速调用进0环使用的KiFastCallEntry函数时，我们发现，<strong>快速调用进入0环时也是通过TSS来获取esp0</strong>的值的，所以MSR寄存器给的值，实际上只是作为中间过渡用<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-53-39-a106304f84912ca9563917ad05d96832-kfce-d9e77d.png"></li>
+</ul>
+<p>那么问题来了，TSS寄存器里面的这个<strong>esp0</strong>，到底是<strong>哪来的</strong>？如何保证<strong>每次切换线程后</strong>，TSS中的<strong>esp0对应的仍然是当前线程的</strong>esp0呢？分析SwapContext函数时便会找到答案。</p>
+</li>
+<li><p>另一个问题呢，是关于FS的；我们知道FS:[0]寄存器在<strong>3环时指向TEB</strong>，<strong>进入0环</strong>后FS:[0]<strong>指向KPCR</strong>；系统中同时存在很多个线程，那该<strong>如何保证</strong>FS:[0]在3环时一定是<strong>指向的当前正在运行的线程</strong>呢？同样，想知道这个答案，我们也需要通过分析SwapContext函数来解开。</p>
+</li>
+</ul>
+<h2 id="SwapContext"><a href="#SwapContext" class="headerlink" title="SwapContext"></a>SwapContext</h2><p>SwapContext函数比较长，就分为5个部分来进行分析，当然，这<strong>5个部分是连续</strong>的。另外，由于我已经在IDA中分析好了，这里就不贴上源码，直接通过图片来分析了。</p>
+<h3 id="Part1"><a href="#Part1" class="headerlink" title="Part1"></a>Part1</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-54-04-c388fe356e36c857eb27e886afe69fb6-part1-7e8102.png"></p>
+<ol>
+<li><p>来看看这部分做了些啥事，首先将**目前线程(即将切换的线程)**的线程状态置为2。这一部分有几个外部通过寄存器传进来的参数的含义，具体可以看图</p>
+</li>
+<li><p>第二步<strong>将Eflags入栈</strong>，在线程切换时，会有很多判断操作，势必会影响到标志寄存器的值，这里需要保存一下</p>
+</li>
+<li><p>接下来的4行，放在一起看。这里有两个操作：</p>
+<p>1）将ExceptionList入栈，由于将发生线程切换，需要<strong>保存当前线程的异常链表</strong>。ebx指向的KPCR，所以**[ebx]的值刚好是KPCR的第一个成员NtTib内的第一个成员**，也就是ExceptionList</p>
+<p>2）KPCR+0x994的位置是DPCRoutineActive，<strong>DPC是延迟过程调用</strong>，和APC相对，这里不再扩展，需要注意一点，这个会有个判断，<strong>如果DPCRoutineActive的值不为0，那就执行蓝屏程序</strong></p>
+</li>
+<li><p>第四步，这个_PPerfGlobalGroupMask，仅仅在Windows Server2003中，5.2版本出现的一个字段，位于NtTib+0x08的位置，主要<strong>与日志，调式相关</strong>的。</p>
+</li>
+<li><p>到这就差不多了，接下来从mov ebp, cr0这条指令开始，开始第二部分的分析</p>
+</li>
+</ol>
+<h3 id="Part2"><a href="#Part2" class="headerlink" title="Part2"></a>Part2</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-54-26-df9540866d48cf13f9773ff54b58d3b1-part2-875dba.png"></p>
+<ol>
+<li><p>来看第二部分，先让edx获取当前线程的Cr0寄存器的值。这里仅作暂存，具体后面会用到</p>
+</li>
+<li><p>KPCR中需要保存<strong>当前线程的相关信息</strong>，所以接下来，获取到<strong>目标线程的DebugActive</strong>写入到KPCR的DebugActive位上</p>
+</li>
+<li><p>这一步，比较好理解。毕竟一会要进行线程切换，总不能切换到一半去执行别的任务吧。因此就把中断屏蔽了</p>
+</li>
+<li><p><strong>保存当前线程的esp到KernelStack</strong>字段中，这是我们熟知的<strong>经典线程切换操作的第一步</strong>。为什么没有紧接着进行第二步的操作呢？因为还有一些细节需要处理。接着往下看</p>
+</li>
+<li><p>第五步，主要做一些准备工作，这里能有两个操作，分别来看看</p>
+<p>1）将目标线程的StackLimit保存到KPCR的StackLimit位置上</p>
+<p>2）将目标线程的InitialStack处的值减去0x210后，赋到StackBase上。为什么要减去0x210呢？这里涉及到了内核堆栈的结构<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-54-59-6c3497092b0da4a0354ae1c144d7193a-kernelStack-1da122.png"><br>每个线程的内核堆栈，栈底开始共有<strong>0x210个字节用于存储浮点寄存器</strong>相关的内容。因此KPCR中记录的栈基址需要减去0x210个字节</p>
+</li>
+<li><p>第六步，仍然是与浮点寄存器相关，在KTHREAD+0x031的位置，有一个字段叫做NpxState。这里主要是判断NpxState有没有浮点支持，以及上一个线程和当前线程对于浮点的支持是否相同，来决定是否需要重新修改Cr0寄存器的值。</p>
+</li>
+<li><p>下一部分，从loc_80004983开始</p>
+</li>
+</ol>
+<h3 id="Part3"><a href="#Part3" class="headerlink" title="Part3"></a>Part3</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-55-57-c78d63e314424d2885cfc3b0e97e5db7-part3-3c2b58.png"></p>
+<ol>
+<li><p>这部分内容较多，慢慢来看，第一步eax-0x10，结合Part2的分析可以知道，eax刚刚提升了0x210个字节，用于存储浮点寄存器相关内容，这里又提升0x10个字节的目的，同样可以根据上图可知，**_Trap_Frame结构的开始部分<strong>，有</strong>0x10字节<strong>存储的内容是</strong>用于虚拟8086模式**下的值，因此这里再次提升0x10字节的堆栈</p>
+</li>
+<li><p>第二步是最为关键的一步，这里实现了两个关键的操作：</p>
+<p>1）将eax存的值赋值给TSS.esp0的位置，之前分析3环进0环时，有提到过，进入0环后的esp的位置，这里回顾一下：<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-57-20-b51d82357959d008f400b4865b55581b-trapFrame-255d59.png"><br>而此时，<strong>eax所存的值，刚好位于快速调用进0环后esp所处的位置</strong>(<strong>InitialStack-0x210-0x10</strong>)。所以这个值，就<strong>是3环进0环后esp0的值</strong>，此处将这个值赋值给了TSS.esp0，自然也就<strong>解释了为什么TSS中存的esp0总是指向当前线程的0环堆栈</strong>，原因就是，<strong>每次堆栈切换发生时</strong>，SwapContext函数内，都会将切换后，<strong>线程堆栈栈顶存储到TSS.esp0的位置</strong></p>
+<p>2）第二个操作，哎，是我们非常熟悉的<strong>线程切换的经典步骤第二步</strong>，切换堆栈。这里就不多解释了，总之，至此，<strong>堆栈切换完成</strong>了，但是还是有一些善后工作需要处理。相比海哥的ThreadSwitch模拟切换函数来说，SwapContext还是略微复杂些的。</p>
+</li>
+<li><p>第三步，很容易看懂，设置KPCR.NtTib.Self指向Teb。这步有啥用呢？到Part4就能明白啦</p>
+</li>
+<li><p>第四步，就做了一个事，判断线程切换前后的2个线程，是不是属于同一个进程，方法也很简单，分别取两个线程KTHREAD+0x44位置指向的值（这里要注意下，在KTHREAD+0x34的偏移处，有一个ApcState结构体，其中+0x10位置<strong>存着指向当前线程所属进程的指针</strong>）<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-56-53-867c73e21ab3cb92e8ee83674fe2d113-apcState-b417d7.png"><br>然后比较一下，若值不相同的话，那就将<strong>新的线程所属进程结构体的指针</strong>保存到edi中</p>
+</li>
+<li><p>第五步，紧接着第四步继续，如果俩线程的所属进程不同，就会走到这一步。这一步也有两个操作：</p>
+<p>1）<strong>因为进程切换</strong>了，因此Cr3的值也要跟着变，因此这里从新的进程中获取Cr3，并保存到TSS中</p>
+<p>2）同理，另一个需要更新的值，IO位图，也就是TSS最后一个元素，当然，这个值不重要，详情见图</p>
+</li>
+<li><p>下一部分，从loc_800049D7开始</p>
+</li>
+</ol>
+<h3 id="Part4"><a href="#Part4" class="headerlink" title="Part4"></a>Part4</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-57-08-022aa8148053c169d9cb9dcde3d9e92e-part4-516a6f.png"></p>
+<ol>
+<li>这一部分，也就做一些收尾工作了，毕竟线程切换已经完了嘛。这里的第一步，最为关键。Part3的第三步，让<strong>KPCR.NtTib.Self指向了Teb</strong>。这里就用上了。我们有了这个Teb的地址后，就通过移位，将这个地址分3个部分(根据段描述符的结构)，<strong>写入到GDT表中，下标为7的这个段描述符中</strong>。这个段描述符<strong>对应的段选择子是0x3B</strong>，也就是3环FS寄存器存着的段选择子。这就解释了文章开头提到的第二个问题，为什么3环FS:[0]指向的一定是当前线程的Teb，原因就在这里，因为<strong>每次线程切换</strong>时，都会<strong>给3环FS:[0]对应的段描述符赋上当前线程Teb的地址</strong></li>
+<li>第二步，主要做了一些统计相关的操作，例如，CPU发生了多少次线程切换，以及这个线程被切换了多少次</li>
+<li>第三步，主要做了一些恢复现场的工作，具体看图中注释。</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>至此，SwapContext函数已分析完毕，我们进一步了解了线程切换的细节，以及线程切换时，对TSS，FS的影响</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>进程与线程</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>时间片管理与备用线程</title>
+    <url>/2022/04/04/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E6%97%B6%E9%97%B4%E7%89%87%E7%AE%A1%E7%90%86%E4%B8%8E%E5%A4%87%E7%94%A8%E7%BA%BF%E7%A8%8B/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>前一篇，我们主要分析了线程切换的几种情况，其中一种是<strong>时钟中断</strong>，但并不是说只要有时钟中断就一定会切换线程，时钟中断时，两种情况会导致线程切换：</p>
+<ul>
+<li>当前<strong>线程的CPU时间片到期</strong></li>
+<li>存在备用线程（KPCR.PrcbData.NextThread处值不为空）</li>
+</ul>
+<h2 id="CPU时间片"><a href="#CPU时间片" class="headerlink" title="CPU时间片"></a>CPU时间片</h2><h3 id="ThreadQuantum"><a href="#ThreadQuantum" class="headerlink" title="ThreadQuantum"></a>ThreadQuantum</h3><p>当一个新的线程开始执行时，初始化程序会在KTHREAD.Quantum赋初始值，该值的大小由KPROCESS.ThreadQuantum决定<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-37-53-e8e91a01e1158c2680d32c3bd60fa125-threadQuantum-7070a5.png"><br>随机选择一个进程查看，发现ThreadQuantum的值为6。这个值，就是<strong>该进程的线程执行时的CPU时间片</strong>。那如何使用这个值呢？我们接下来继续看。</p>
+<h3 id="分析KeUpdateRunTime"><a href="#分析KeUpdateRunTime" class="headerlink" title="分析KeUpdateRunTime"></a>分析KeUpdateRunTime</h3><p>每次时钟中断发生时都<strong>会先调用KeUpdateRunTime函数</strong>，我们来看看这个函数干了什么事<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-38-27-a20a2355aa12a0ebb2f2c8c5e0ce9b82-kurt1-9959f7.png"><br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-38-44-67e725f679b8ba67f3e003d0fce135b3-kurt2-c7e585.png"><br>结合两张图来看，ebx保存的是<strong>当前线程的KTHREAD</strong>，接着将当前线程的Quantum的值-3。这下就清晰一些了，前面说了，一个线程初始的Quantum值为6，这里<strong>将Quantum的值 减了3</strong>。然后还做了什么呢，根据上面的信息，可以得知eax保存的KPCR，下面有一个逻辑判断，如果减3后值不为0，这里程序就跳转了，<strong>但是如果为0，此时程序会给KPCR+0x9AC处（QuantumEnd)的值赋上一个不为0的值</strong>，这个操作有什么用呢？往后看就知道了。</p>
+<h3 id="分析KiDispatchInterrupt"><a href="#分析KiDispatchInterrupt" class="headerlink" title="分析KiDispatchInterrupt"></a>分析KiDispatchInterrupt</h3><p>这里小盆友可能会奇怪了，为什么突然就从KeUpdateRunTime就跳到这了呢？这里需要说明一下，KeUpdateRumTime函数，是每次时钟中断发生时都会调用的函数，这个函数做了两件事：</p>
+<ol>
+<li>将当前<strong>线程的KTHREAD.Quantum的值减3</strong></li>
+<li>若Quantum的值减到了0，则会<strong>将KPCR.QuantumEnd的值置为一个不为0的数</strong></li>
+</ol>
+<p>之后这个函数就执行完了，接着，就是我们上一篇分析过的，时钟中断的执行流程，最终，在进行线程切换之前，会执行到KiDispatchInterrupt函数，接下来，就来看看刚刚修改过的两个值，和这个函数有何关系：</p>
+<ol>
+<li>进入KiDispatchInterrupt函数，这里有一个判断，稍作分析<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-40-40-0f427a45aef76d2276b4a49aca5eb2db-kdi1-20ae06.png"><br>这里的ebx存着的是KPCR，然后程序会去<strong>判断KPCR.QuantumEnd处的值是否为0</strong>，如果不是0，说明时间片走完了，<strong>也就是KTHREAD.Quantum值被减为0了</strong>，这是就会进行跳转，图中会跳转到loc_404902的位置</li>
+<li>跟到loc_404902的位置继续观察<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-41-11-210831ef72dd38e48426bfd2ce8b8f13-kdi2-98b90b.png"><br>这里先<strong>将KPCR.QuantumEnd的值置零</strong>，然后跳转到KiQuantumEnd函数中继续执行（为什么先赋值，再清零呢？因为已经判断过了，已经跳转到这里了，将QuantumEnd的值置零，也是为了下一个执行的线程)</li>
+<li>好，进入KiQuantumEnd函数<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-41-49-7a9f2410f0480ff84a297a40ed08cc75-kqe1-2abab6.png"><br>具体细节看图，这部分，主要是重新<strong>设置了当前这个线程的CPU时间片的值为ThreadQuantum</strong>。接着往下看<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-42-02-735db5a4661c813390ea8d815f188775-kqe2-62104d.png"><br>然后这个函数调用了KiFindReadyThread函数，在就绪队列中找到一个线程，接着就返回了</li>
+<li>执行完KiQuantumEnd函数后，我们又回到了KiDispatchInterrupt函数<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-42-34-1f42f4998e434a813c7e798bd9452536-kdi3-08383c.png"><br>如果刚刚在KiFindReadyThread可以在就绪队列中找到一个线程，那么eax的值就不为空，如图，接下来会跳转到loc_4048BB的位置</li>
+<li>接着看4048BB的位置<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-42-47-a127e25b6215a539091e8ba6d9e20d54-kdi4-121bd3.png"><br>看到了我们熟悉的线程切换函数</li>
+</ol>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>通过分析KeUpdateRunTime和KiDispatchInterrupt函数，我们可以发现。在CPU时间片用完的情况下，当时钟中断发生时，会发生线程的切换，这里做个小结：</p>
+<ul>
+<li>当一个新的线程开始执行时，初始化程序会<strong>在KTHREAD.Quantum赋初始值</strong>，该值的<strong>大小由KPRCOESS.ThreadQuantum决定</strong></li>
+<li>每次时钟中断会调用KeUpdateRunTime函数，该函数每次将当前线程Quantum减少3个单，如果减到0，则将KPCR.PrcbData.QuantumEnd的值<strong>设置为非0</strong></li>
+<li>KiDispatchInterrupt判断<strong>时间片到期后</strong>，<strong>调用KiQuantumEnd函数</strong>（重新设置时间片、找到要运行的线程）</li>
+</ul>
+<h2 id="备用线程"><a href="#备用线程" class="headerlink" title="备用线程"></a>备用线程</h2><p>这里我们直接定位到KiDispatchInterrupt的位置，看图<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-36-55-f97b7a3a8b247e7685b76222b1e33d46-kdi5-34abff.png"><br>可以发现，这是刚刚判断时间片是否到期的位置，这里共有两个判断：</p>
+<ol>
+<li>若CPU时间片<strong>到期</strong>（即KPCR.QuantumEnd的<strong>值为非0</strong>），<strong>则跳转</strong>，否则继续执行</li>
+<li>若存在备用线程，则将备用线程取出。啥是备用线程呢？就是KPCR+0x128的位置，该处成员名称叫做NextThread，是一个KTHREAD结构。如果这个位置的值不为0，那么程序会继续执行</li>
+</ol>
+<p>后面的事情，看图片也就知道了。取出备用线程后，会先<strong>将当前线程放入就绪链表</strong>。这里为什么不放入等待链表呢？因为该线程处于就绪状态，只是在<strong>时钟中断发生时</strong>CPU时间片走完了或者存在备用线程，所以不会放入等待链表中。</p>
+<p>当然。如果两个判断都没有执行，程序会直接跳到最后，返回了，也就是不发生线程切换<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-37-14-f93a414e76e290d12e8d3ce1be45d509-kdi6-d1d259.png"></p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><ol>
+<li><p>当前线程<strong>主动调用</strong>API：</p>
+<p>KiSwapThread -&gt; KiSwapContext -&gt; SwapContext</p>
+</li>
+<li><p>当前线程<strong>时间片到期</strong>：<br>KiDispatchInterrupt -&gt; KiQuantumEnd -&gt; SwapContext</p>
+</li>
+<li><p><strong>存在备用线程</strong>：<br>KiDispatchInterrupt -&gt; SwapContext</p>
+</li>
+</ol>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>进程与线程</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Windows线程切换</title>
+    <url>/2022/04/03/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/Windows%E7%BA%BF%E7%A8%8B%E5%88%87%E6%8D%A2/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>前一篇介绍了一份模拟线程切换代码，通过对代码的分析和学习，我们知道了<strong>线程切换的本质就是堆栈的切换</strong>，其中有一个非常关键的函数：<strong>SwitchContext</strong>，当调用这个函数时，就会导致线程切换。同样，Windows也有一个用于线程切换的函数：<strong>KiSwapContext</strong></p>
+<h2 id="KiSwapContext分析"><a href="#KiSwapContext分析" class="headerlink" title="KiSwapContext分析"></a>KiSwapContext分析</h2><p>我们先从这个函数开始说起，当然，相比模拟线程切换的代码，Windows中切换线程的代码更为复杂，但本质还是一样的，这里不作详细分析，分析关键函数，找到KiSwapContext的核心实现。</p>
+<ol>
+<li>首先定位到KiSwapContext<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-19-49-50-36208f44243c436fd8457e2a023d88bb-kiSwapContext-e75f15.png"><br>根据这几步，我们发现，外层函数传来了一个未知的参数ecx</li>
+<li>我们跟进调用KiSwapContext的KiSwapThread<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-19-50-24-524fd486501f5a19bffd26e7a6f07a3c-kstCallksc-57d86b.png"></li>
+<li>分析调用KiSwapContext的代码<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-19-51-40-7d1f1d869307ade6334e4faa3f7ff1cb-kiSwapThread-44145e.png"><br>可以发现，ecx的值，来源于KiFindReadyThread的返回值，顾名思义，这是一个<strong>在就绪队列中查找线程的函数</strong>，因此返回值应为一个KTHREAD</li>
+<li>有了上面几步的分析，再回来看，就好理解了<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-19-52-37-08ca3bc4d5cc07ec515919e51e64a4d6-kiSwapContext2-f4cf33.png"><br>这几步的含义是，先把当前运行的线程取出到edi中，然后将刚刚从就绪队列中取出来的线程，放到KPCR中。我们可以看到，目前esi，edi，分别存放了切换后将执行的线程和正在执行的线程，但这里没有实现，需要进一步跟进SwapContext函数。</li>
+<li>进入SwapContext函数后，忽略细节，我们可以很快找到线程切换最精髓的两条语句<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-19-53-23-bfbeae342fef6bb83a0e27fab304fd2f-swapContext-9ef3e7.png"><br><strong>堆栈切换</strong>，回忆一下，上一篇模拟线程切换的程序里，线程切换最关键的两条语句也是这样的原理，<strong>将esp保存到原线程的KernelStack中，并将新线程的KernelStack的值赋给esp，从而实现堆栈的切换，这也就是线程切换的本质</strong>。</li>
+</ol>
+<h2 id="主动切换"><a href="#主动切换" class="headerlink" title="主动切换"></a>主动切换</h2><h4 id="函数调用过程"><a href="#函数调用过程" class="headerlink" title="函数调用过程"></a>函数调用过程</h4><p>在分析完KiSwapContext函数后，我们可以总结出这样一个调用过程：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">KiSwapThread -&gt; KiSwapContext -&gt; SwapContext(内部实现线程切换)</span><br></pre></td></tr></table></figure>
+
+<p>虽然，真正的切换是SwapContext函数实现的，但是经过分析，从KiSwapThread到KiSwapContext再到SwapContext是一个顺序执行的过程。所以我们可以认为，<strong>凡是调用了KiSwapThread函数，就一定会触发线程切换</strong>。</p>
+<ul>
+<li>在IDA中查看KiSwapThread的交叉引用表<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-24-00-9ba109e51637d5d12269df353353b592-kstXref-d65b1f.png"><br>我们可以看到，一共有<strong>7个函数调用了KiSwapThread</strong>函数，说明<strong>执行这些函数时，都会发生线程切换</strong></li>
+<li>随机选取其中一个调用KiSwapThread的函数：KeWaitForSingleObject，查看KeWaitForSingleObject的交叉引用表<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-25-23-72df135ade99ffbed2c4b51834d5fd6e-kwfsoXref-ba3084.png"><br>可以看到有很多函数都调用了KeWaitForSingleObject，这也意味着这些函数在执行时，都会发生线程切换，因为它们最终都会调用SwapContext函数</li>
+</ul>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><p>我们可以看到，Windows中绝大部分API都会直接或间接调用SwapContext这个函数，也就是说，只要调用这些API函数，就会发生线程切换，这种通过<strong>调用API函数导致的线程切换叫做主动切换。</strong></p>
+<h2 id="时钟中断切换"><a href="#时钟中断切换" class="headerlink" title="时钟中断切换"></a>时钟中断切换</h2><p>上面介绍了主动切换，需要依赖对系统API函数的调用才能触发。那么，如果不去主动调用系统API函数，该如何触发线程切换呢？这里介绍另一个导致线程切换的方式，通过<strong>时钟中断</strong>。</p>
+<p>为何要采用时钟中断的方式呢？实际上我们在切换线程时，必须先让当前执行的线程停下来，保存了线程当前的环境后，再去切换线程。线程的暂停也意味着程序的暂停。那么，如何中断一个正在执行的程序呢？</p>
+<ol>
+<li><strong>异常</strong>：例如缺页异常或者INT N指令</li>
+<li><strong>中断</strong>：例如时钟中断</li>
+</ol>
+<h3 id="系统时钟"><a href="#系统时钟" class="headerlink" title="系统时钟"></a>系统时钟</h3><table>
+<thead>
+<tr>
+<th>（IDT表）中断号</th>
+<th>IRQ</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0x30</td>
+<td>IRQ0</td>
+<td>时钟中断</td>
+</tr>
+</tbody></table>
+<ul>
+<li>在Windows操作系统中，每10~20毫秒便会触发一次时钟中断</li>
+<li>想要获取当前版本Windows时钟间隔值，可使用Win32API：GetSystemTimeAdjustment</li>
+</ul>
+<h3 id="时钟中断的执行流程"><a href="#时钟中断的执行流程" class="headerlink" title="时钟中断的执行流程"></a>时钟中断的执行流程</h3><p>进入IDA，我们一起来分析一下时钟中断的执行流程</p>
+<ol>
+<li><p>Alt+T 搜索_IDT，找到IDT表<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-26-19-84d55a25ab7be9bd7354708836893347-idt-af338e.png">](ht</p>
+</li>
+<li><p>之前中断门进0环学习过，int 2e执行的是KiSystemService，而时钟中断是int 30，所以我们可以很快定位它的中断例程是KiStartUnexpectedRange()<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-26-02-3152b9648123d2be6864f165660aaf11-int30-1fa321.png"></p>
+</li>
+<li><p>进入KiStartUnexpectedRange<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-27-16-5b4dd358bc194eda43827b18c7a88a30-ksur-7ad99c.png"><br>发现里面跳转到了KiEndUnexpectedRange函数</p>
+</li>
+<li><p>继续跟进KiEndUnexpectedRange<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-30-00-c263e1bb2b84cb3131a2b09ccfdd2599-keur-68ab63.png"><br>内部跳转到函数KiUnexpectedInterruptTail</p>
+</li>
+<li><p>进入KiUnexpectedInterruptTail内部<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-30-16-a3facb3812e88133e7e9c1d71910b760-kuit-6c7c45.png"></p>
+<p>在这个函数结束前，我们可以看到，它调用了一个外部函数HalEndSystemInterrupt，在导入表中可以看到，这个外部函数位于HAL.dll<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-30-43-aa7bcd04c5a5b61505b1b75833c7d4eb-halDll-1aa6b5.png"></p>
+</li>
+<li><p>用IDA打开hal.dll，找到HalEndSystemInterrupt继续分析，这个函数不大，一眼看完就可以发现，它又调用了一个外部函数KiDispatchInterrupt<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-31-58-e47888c2655b9bf5db89430681819360-2022-08-14-20-31-01-e47888c2655b9bf5db89430681819360-hesi-f62210-485e6e.png"><br>我们再次进入导入表查看<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-32-33-d39ef43ea8f05d379859e72f1bcf5190-ntoskrnlDll-a397ca.png"><br>巧了嘛！这个函数是ntoskrnl的，又调回去了。。。</p>
+</li>
+<li><p>我们进入KiDispatchInterrupt康康<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-34-12-6427508fe320a0ee9a0e2e6aaeb82b2e-kdi-52168c.png"><br>哦吼，我们发现了什么？这不是就是<strong>SwapContext</strong>嘛！就是线程切换函数！</p>
+</li>
+<li><p>经过这么多步，终于找到了关键的函数，这里简单梳理一下流程<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-33-30-b9ff75638384fef316f040edab9d0314-flow-c11b6e.png"></p>
+</li>
+</ol>
+<h4 id="小结-1"><a href="#小结-1" class="headerlink" title="小结"></a>小结</h4><p>分析完时钟中断的执行流程可以发现，时钟中断最终会执行SwapContext函数，同样会发生线程切换。</p>
+<h2 id="异常处理"><a href="#异常处理" class="headerlink" title="异常处理"></a>异常处理</h2><p>还有一种导致线程切换的就是异常处理了。当程序发生异常时，会根据中断号，跳转到相应中断处理例程进行处理，也会导致线程的切换，这里不作详细分析了。具体的可以参考<a href="https://happy1wawayu.github.io/2022/03/16/%E4%BF%9D%E6%8A%A4%E6%A8%A1%E5%BC%8F/%E4%BB%BB%E5%8A%A1%E6%AE%B5/#%E8%A6%81%E7%82%B9%E5%9B%9E%E9%A1%BE">任务段</a>这篇通过TSS模拟实现进程切换。本质同样是堆栈的切换。</p>
+<h2 id="关于进程切换"><a href="#关于进程切换" class="headerlink" title="关于进程切换"></a>关于进程切换</h2><p>本质上，<strong>进程的切换就是线程的切换</strong>，所以并不存在真正意义上进程的切换，与普通线程的切换相比，进程的切换仅仅是，两个线程不属于同一进程。因此在线程切换的过程中，Cr3换了，从而进程也就换了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><ol>
+<li>如果一个线程<strong>不调用API</strong>，并且在代码中<strong>屏蔽中断</strong>（通过CLI指令），并且程序<strong>不会出现异常</strong>，那么当前线程将永久占有CPU（单核CPU占用率100%，2核CPU占用率50%）</li>
+<li>Windows并且是“抢占式”操作系统，所谓的“抢“<strong>必须是当前线程允许其它线程</strong>“抢”，否则是“抢”不到的</li>
+</ol>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>进程与线程</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>线程优先级</title>
+    <url>/2022/04/05/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E7%BA%BF%E7%A8%8B%E4%BC%98%E5%85%88%E7%BA%A7/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>前面分析过了SwapContext函数，用来线程切换的；<strong>线程切换需要2个线程</strong>，一个是<strong>当前线程</strong>，一个是<strong>用来切换的目标线程</strong>，我们知道<strong>当前线程可以通过KPCR+0x124位置的CurrentThread获得</strong>，那么目标线程该如何获得呢？下面一块来研究一下</p>
+<h2 id="线程切换的方式"><a href="#线程切换的方式" class="headerlink" title="线程切换的方式"></a>线程切换的方式</h2><p>先回顾一下线程切换三种方式的过程：</p>
+<ol>
+<li><p>当前线程<strong>主动调用API</strong>：</p>
+<p>API函数 -&gt; KiSwapThread -&gt; KiSwapContext -&gt; SwapContext</p>
+</li>
+<li><p>当前线程<strong>时间片到期</strong>：</p>
+<p>KiDipatchInterrupt -&gt; KiQuantumEnd -&gt; SwapContext</p>
+</li>
+<li><p>KPCR中存<strong>有备用线程</strong>：</p>
+<p>KiDispatchInterrupt -&gt; SwapContext</p>
+</li>
+</ol>
+<p>在<strong>有备用线程</strong>的条件下，SwapContext的目标线程参数可以通过(KPCR.PrcbData.NextThread)直接取出。那么另外两种方式，是如何找到下一个要切换的线程呢？</p>
+<ul>
+<li>先看<strong>主动调用API</strong>的方式，进入IDA分析一下KiSwapContext函数执行之前的流程<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-59-48-b23747cf33861a3b9816f8067f05dcef-kst-8b4f60.png"><br>由图，我们可以看出，KiSwapThread函数内，会<strong>先执行KiFindReadyThread</strong>取出<strong>目标线程</strong>，之后<strong>再执行KiSwapContext</strong>函数的</li>
+<li>再看<strong>时间片到期</strong>的方式，我们进入KiQuantumEnd进行分析<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-58-12-b7912e33bffd58f8b879c42c6f825cfa-kqe-b43f70.png"><br>可以发现，KiQuantumEnd内部，也会先执行KiFindReadyThread函数，返回一个线程结构体</li>
+</ul>
+<p>通过分析可以得知，线程切换的目标线程，与KiFindReadyThread有关，接下来就结合KiFindReadyThread函数来分析一下如何获取目标线程。</p>
+<h2 id="线程查找"><a href="#线程查找" class="headerlink" title="线程查找"></a>线程查找</h2><p>在分析查找线程之前，我们先来回顾一下之前学习的<a href="https://happy1wawayu.github.io/2022/04/01/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E7%AD%89%E5%BE%85%E9%93%BE%E8%A1%A8&%E8%B0%83%E5%BA%A6%E9%93%BE%E8%A1%A8/">调度链表</a>的知识<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-58-12-6a19d58482b1183916cb4fed8bdd2664-kdrlh-fe75d4.png"><br>调度链表共32个，如果说一个线程，它满足运行条件了，就会被扔到这个链表里面(<strong>根据优先级</strong>)，也就是说，<strong>线程切换的时候</strong>，就是<strong>从这个调度链表里面找</strong>一个线程出来，而KiFindReadyThread函数就是干这事的。</p>
+<h3 id="KiFindReadyThread查找方式"><a href="#KiFindReadyThread查找方式" class="headerlink" title="KiFindReadyThread查找方式"></a>KiFindReadyThread查找方式</h3><p>这个函数的查找方式非常简单暴力，会按照优先级别进行查找：31..30..29..28</p>
+<p>换句话说，在<strong>本次查找</strong>中，<strong>如果级别31的链表里面有线程</strong>，那么就不会查找级别为30的链表，直接从级别31的链表里取一个出来</p>
+<h3 id="如何高效查找"><a href="#如何高效查找" class="headerlink" title="如何高效查找"></a>如何高效查找</h3><p>调度链表有32个，如果每次都从开始查找效率就太低了，因此Windows通过一个DWORD类型的变量来记录：</p>
+<p>当向<strong>调度链表（32个）中挂入或者摘除某个线程时</strong>，会<strong>判断当前级别的链表是否为空</strong>，会判断当前级别的链表是否为空，为空则将DWORD变量（_KiReadySummary）对应位置0，否则置1。大致如下图：<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-58-12-06c2cef3b52f2f742c87d29e075a1e8c-krs-fb175c.png"><br>多CPU下会随机寻找KiDispatcherReadyListHead指向的数组中的线程。线程可以绑定某个CPU（使用API：setThreadAffinityMask)</p>
+<h3 id="如果没有就绪线程怎么办"><a href="#如果没有就绪线程怎么办" class="headerlink" title="如果没有就绪线程怎么办"></a>如果没有就绪线程怎么办</h3><p>这里我们先了解一下如何看调度链表<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-04-56-07ad8017c34559a59e51829137623a83-null-97b16c.png"></p>
+<p>大致分三种情况：</p>
+<ol>
+<li><strong>双向链表的值一样</strong>，<strong>且等于当前地址</strong>，说明该链表是空的</li>
+<li><strong>双向链表的值一样</strong>，但是<strong>不等于当前地址</strong>，说明该链表只有一个线程</li>
+<li><strong>双向链表的值不一样</strong>，说明链表中存在2个或者2个以上个线程</li>
+</ol>
+<p>那么，如果32个调度链表都是空的怎么办？</p>
+<p>我们来进入IDA看一下执行流程：</p>
+<ol>
+<li>查看KiFindReadyThread执行后的代码<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-58-12-d5e1cc09e80b804337f8d068717baa14-jmp-101afe.png" alt="img"><br>若eax值为空（即<strong>没有取到线程</strong>)那么会跳转到loc_8000EA85的位置执行</li>
+<li>来看看loc_8000EA85处做了什么<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-20-58-13-135c9d481413ae5c15634bece9a5ecf9-idle-25c496.png"><br>实际上只做了一件事，就是给eax赋值，因为KiFindReadyThread函数没有找到就绪线程，因此eax值是空的，这里<strong>给eax赋的值</strong>，就<strong>是KPCR.PrcbData.IdleThread</strong>。也就是KPCR中存着的空闲线程</li>
+</ol>
+<p>这下我们弄明白了，<strong>如果就绪链表中没有线程</strong>，那么发生<strong>线程切换时</strong>，会<strong>切换到一个Idle线程</strong>继续执行，从而保证CPU一直稳定的执行</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>进程与线程</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>进程挂靠</title>
+    <url>/2022/04/06/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E8%BF%9B%E7%A8%8B%E6%8C%82%E9%9D%A0/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>在学习进程挂靠之前，先回顾一下进程与线程相关的知识</p>
+<h2 id="进程与线程的关系"><a href="#进程与线程的关系" class="headerlink" title="进程与线程的关系"></a>进程与线程的关系</h2><h3 id="基本关系"><a href="#基本关系" class="headerlink" title="基本关系"></a>基本关系</h3><ul>
+<li>一个进程<strong>可以包含多个线程</strong></li>
+<li>一个进程<strong>至少要有一个线程</strong></li>
+</ul>
+<p><strong>进程</strong>为线程提供资源，也就是<strong>提供Cr3</strong>的值，Cr3中存储的是页目录表基址，Cr3确定了，线程能访问的内存也就确定了。</p>
+<h3 id="代码分析"><a href="#代码分析" class="headerlink" title="代码分析"></a>代码分析</h3><p>来看这样一行代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov eax,dword ptr ds:[0x12345678]</span><br></pre></td></tr></table></figure>
+
+<p>CPU如何解析0x12345678这个地址呢？</p>
+<ol>
+<li>CPU解析线性地址时，需要通过<strong>页目录表（PDT）</strong>来找到对应的物理页，页目录表基址存在Cr3寄存器中，这些都是保护模式的内容，已经很熟悉了</li>
+<li>当前的Cr3的值来源于当前的进程（_KPROCESS.DirectoryTableBase(+0x018)）<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-07-53-7c601add397b7380735877d1eba449e9-dtb-52ea14.png"></li>
+</ol>
+<h3 id="线程找进程"><a href="#线程找进程" class="headerlink" title="线程找进程"></a>线程找进程</h3><p>线程找进程有两种情况：<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-09-19-f41925736c717f1d2ca9a69687178f4a-threadFindProcess-5b0a00.png"></p>
+<ol>
+<li><strong>KHTREAD.ApcState.Process</strong>(+0x44)</li>
+<li><strong>ETHREAD.ThreadProcess</strong>(+0x220)</li>
+</ol>
+<p>所以，从KTHREAD以及ETHREAD均能找到当前线程的进程，这里引用海哥的叫法，把KTHREAD找到的Process(+0x44)叫做<strong>养父母</strong>，把ETHREAD找到的ThreadProcess(+0x220)叫做<strong>亲生父母</strong></p>
+<h3 id="养父母负责提供Cr3"><a href="#养父母负责提供Cr3" class="headerlink" title="养父母负责提供Cr3"></a>养父母负责提供Cr3</h3><p>线程切换的时候，会<strong>比较KTHREAD结构体0x044处指定的EPROCESS</strong>是否为同一个，如果不是同一个，会将0x044处指定的EPROCESS的DirectoryTableBase的值取出，赋值给Cr3。这部分在分析SwapContext的<a href="https://cataloc.gitee.io/blog/2020/04/03/%E5%88%86%E6%9E%90SwapContext/#Part3">Part3</a>部分提到过，这里不多赘述。可以跳转或者参考下图的紫色部分<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-07-54-c78d63e314424d2885cfc3b0e97e5db7-part3-ff4ddf.png"></p>
+<p>所以，<strong>线程所需要的Cr3</strong>的值，<strong>来源于0x044偏移处</strong>指定的EPROCESS，所以得出如下结论：</p>
+<ul>
+<li>0x220：亲生父母，这个线程谁创建的</li>
+<li>0x044：养父母，谁在为这个线程提供资源（也就提供Cr3）。一般情况下，0x220与0x044指向的是<strong>同一个进程</strong></li>
+</ul>
+<h2 id="进程挂靠"><a href="#进程挂靠" class="headerlink" title="进程挂靠"></a>进程挂靠</h2><p>有了上述概念后，我们知道了，正常情况下，Cr3的值是由养父母提供的，但是Cr3的值也可以改成和当前线程毫不相干的其它进程的DirectoryTableBase。</p>
+<p>观察下面的代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov cr3,A.DirectoryTableBase</span><br><span class="line">mov eax,dword ptr ds:[0x12345678]		; A进程的0x12345678内存</span><br><span class="line">mov cr3,B.DirectoryTableBase</span><br><span class="line">mov eax,dword ptr ds:[0x12345678]		; B进程的0x12345678内存</span><br><span class="line">mov cr3,C.DirectoryTableBase</span><br><span class="line">mov eax,dword ptr ds:[0x12345678]		; C进程的0x12345678内存</span><br></pre></td></tr></table></figure>
+
+<p>将当前Cr3的值改为其它进程，称为“<strong>进程挂靠</strong>”。</p>
+<p>进程挂靠存在的意义是什么呢，上面的代码，分别将不同进程的DirectoryTableBase的值写入Cr3。这时，每次读入的0x12345678这个线性地址上的值，分别<strong>是对应进程上0x12345678线性地址所对应物理页的内容</strong>。有了进程挂靠，就意味着可以读取其它进程的内存。</p>
+<h2 id="分析NtReadVirtualMemory"><a href="#分析NtReadVirtualMemory" class="headerlink" title="分析NtReadVirtualMemory"></a>分析NtReadVirtualMemory</h2><p>我们知道，ReadProcessMemory这个三环API是可以读取其它进程的内存的，该函数在0环的实现是NtReadVirtualMemory，来分析一下这个函数，看看它是如何读取其它进程内存的：</p>
+<ol>
+<li><p>首先，进入NtReadVirtualMemory，由于这个函数非常复杂，就直接挑重点来说了<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-07-54-f71844e5c08d5102f85d0de0b47e2f84-nrvm-81855d.png"><br>这里调用了一个_MmCopyVirtualMemory函数，看名字就感觉，这个和别的进程的内存可能有点关系，毕竟是Copy来的….</p>
+</li>
+<li><p>进入_MmCopyVirtualMemory继续查看<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-11-01-ddd355a5a6beb7bb853b7544f4c20ee8-mcvm-246a22.png">]<br>这个函数不大，有一个函数很关键MiDoPoolCopy，这个函数Push了一大堆参数，内部应该实现了重要的功能，继续更近</p>
+</li>
+<li><p>跟进_MiDoPoolCopy函数<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-07-54-ccc4a9f3800dc62f01bb7903935fbfd2-mdpc-b10b2f.png">]<br>往下翻，有一个KeStackAttachProcess，由名字可知，这个函数和进程挂靠有关</p>
+</li>
+<li><p>再进一步，进入_KeStackAttachProcess函数<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-12-01-2f992e5cffd1c53aec3b9717dfdfb3fb-ksap-87b55b.png"><br>看到这里，就是真正的挂靠函数，进入分析看看Windows到底是如何实现进程挂靠的</p>
+</li>
+<li><p>直接看图<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-12-18-b0d92abf89927dbad6b94ae31eecead4-kap-8f4d7d.png"><br>这里面进行了两个主要的操作：</p>
+<p>1）修改<strong>养父母</strong>，即KTHREAD.ApcState.Process的值，修改为将要访问的进程的<strong>进程结构体</strong></p>
+<p>2）调用进程切换函数KiSwapProcess（<strong>本质是切换Cr3</strong>）</p>
+</li>
+<li><p>进入<strong>KiSwapProcess</strong>看看这个函数具体做了什么<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-07-55-4715b1099d803c9f73dd00e110805b33-ksp-618e18.png"></p>
+<p>来看最关键的部分，KiSwapProcess函数，先从外部参数，获取到了将要访问的进程的Cr3，然后分别<strong>修改TSS.Cr3和KPROCESS+0x18（DirectoryTableBase)处的值</strong>，然后便完成了进程切换。可以发现，进程切换，实际上就是切换了Cr3</p>
+</li>
+</ol>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>简要分析完了NtReadVirtualMemory函数后可以发现，这个函数主要做了两件事，第一件事，<strong>修改线程养父母</strong>，第二件事，<strong>修改进程Cr3</strong>。随后就可以访问和读取另一个进程的内存了。</p>
+<p>那么小盆友要问了，可不可以只修改Cr3，而不修改养父母呢？当然是不可以的，如果不修改养父母的值，一旦发生线程切换，再切回来的时候，<strong>读取的内存，是由养父母提供的Cr3，而养父母没有修改，因此读取的还是自己线程所在的进程</strong>，即变成了自己读自己了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>正常情况下，当前线程使用的<strong>Cr3是由其所属进程提供的</strong>（KTHREAD+0x44偏移处指定的EPROCESS），正是因为如此，A进程中的线程只能访问A的内存。</p>
+<p>如果要让<strong>A进程中的线程能够访问B进程的内存</strong>，就必须<strong>要修改Cr3的值为B进程的页目录表基址</strong>（B.DirectoryTableBase），这就是所谓的“<strong>进程挂靠</strong>”</p>
 ]]></content>
       <categories>
         <category>Windows内核</category>
