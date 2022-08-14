@@ -2074,7 +2074,7 @@
 <li><strong>ETHREAD.ThreadProcess</strong>(+0x220)</li>
 </ol>
 <p>所以，从KTHREAD以及ETHREAD均能找到当前线程的进程，这里引用海哥的叫法，把KTHREAD找到的Process(+0x44)叫做<strong>养父母</strong>，把ETHREAD找到的ThreadProcess(+0x220)叫做<strong>亲生父母</strong></p>
-<h3 id="养父母负责提供Cr3"><a href="#养父母负责提供Cr3" class="headerlink" title="养父母负责提供Cr3"></a>养父母负责提供Cr3</h3><p>线程切换的时候，会<strong>比较KTHREAD结构体0x044处指定的EPROCESS</strong>是否为同一个，如果不是同一个，会将0x044处指定的EPROCESS的DirectoryTableBase的值取出，赋值给Cr3。这部分在分析SwapContext的<a href="https://cataloc.gitee.io/blog/2020/04/03/%E5%88%86%E6%9E%90SwapContext/#Part3">Part3</a>部分提到过，这里不多赘述。可以跳转或者参考下图的紫色部分<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-07-54-c78d63e314424d2885cfc3b0e97e5db7-part3-ff4ddf.png"></p>
+<h3 id="养父母负责提供Cr3"><a href="#养父母负责提供Cr3" class="headerlink" title="养父母负责提供Cr3"></a>养父母负责提供Cr3</h3><p>线程切换的时候，会<strong>比较KTHREAD结构体0x044处指定的EPROCESS</strong>是否为同一个，如果不是同一个，会将0x044处指定的EPROCESS的DirectoryTableBase的值取出，赋值给Cr3。这部分在分析SwapContext的<a href="https://happy1wawayu.github.io/2022/04/05/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E5%88%86%E6%9E%90SwapContext/#Part3">Part3</a>部分提到过，这里不多赘述。可以跳转或者参考下图的紫色部分<br><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-07-54-c78d63e314424d2885cfc3b0e97e5db7-part3-ff4ddf.png"></p>
 <p>所以，<strong>线程所需要的Cr3</strong>的值，<strong>来源于0x044偏移处</strong>指定的EPROCESS，所以得出如下结论：</p>
 <ul>
 <li>0x220：亲生父母，这个线程谁创建的</li>
@@ -2108,6 +2108,31 @@
 <p>那么小盆友要问了，可不可以只修改Cr3，而不修改养父母呢？当然是不可以的，如果不修改养父母的值，一旦发生线程切换，再切回来的时候，<strong>读取的内存，是由养父母提供的Cr3，而养父母没有修改，因此读取的还是自己线程所在的进程</strong>，即变成了自己读自己了。</p>
 <h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>正常情况下，当前线程使用的<strong>Cr3是由其所属进程提供的</strong>（KTHREAD+0x44偏移处指定的EPROCESS），正是因为如此，A进程中的线程只能访问A的内存。</p>
 <p>如果要让<strong>A进程中的线程能够访问B进程的内存</strong>，就必须<strong>要修改Cr3的值为B进程的页目录表基址</strong>（B.DirectoryTableBase），这就是所谓的“<strong>进程挂靠</strong>”</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>进程与线程</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>跨进程读写内存</title>
+    <url>/2022/04/06/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E8%B7%A8%E8%BF%9B%E7%A8%8B%E8%AF%BB%E5%86%99%E5%86%85%E5%AD%98/</url>
+    <content><![CDATA[<h2 id="要点回顾"><a href="#要点回顾" class="headerlink" title="要点回顾"></a>要点回顾</h2><p>跨进程的本质是“<strong>进程挂靠</strong>”，正常情况下，A进程的线程只能访问A进程的地址空间，如果A进程的线程想访问B进程的地址空间，就要修改当前的Cr3的值为B进程的页目录表基址（KPROCESS.DirectoryTableBase）</p>
+<p>即：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov cr3, B.DirectoryTableBase</span><br></pre></td></tr></table></figure>
+
+<h2 id="跨进程操作"><a href="#跨进程操作" class="headerlink" title="跨进程操作"></a>跨进程操作</h2><p>A进程中的线程代码如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov cr3,B.DirectoryTableBase		; 切换Cr3的值为B进程</span><br><span class="line">mov eax,dword ptr ds:[0x12345678]	; 将进程B 0x12345678的值存的eax中</span><br><span class="line">mov dword ptr ds:[0x00401234],eax	; 将数据存储到0x00401234中</span><br><span class="line">mov cr3,A.DirectoryTableBase		; 切换回Cr3的值</span><br></pre></td></tr></table></figure>
+
+<p>这是一个模拟跨进程读写内存的操作，但是代码实际上是存在问题的。代码中，将数据写入到0x00401234这个地址里，但<strong>这个地址是位于B进程地址空间的</strong>，因此A进程中是无法读出来这个值的。那该如何读写另一个进程的内存呢？</p>
+<p>之前，在学习保护模式内容的时候，发现不同进程低2G对应的物理页往往是不同的，但是高2G对应的物理页往往是相同的。可以利用这一点，可以先将数据暂存到高2G的内存，然后切换到另一个进程中，进入读写操作。具体我们来参考一下NtReadVirtualMemory的实现理念。</p>
+<h3 id="NtReadVirtualMemory流程"><a href="#NtReadVirtualMemory流程" class="headerlink" title="NtReadVirtualMemory流程"></a>NtReadVirtualMemory流程</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-21-16-ccc7f2d31a44777089c608966aec82b3-read-285f00.png"></p>
+<h3 id="NtWriteVirtualMemory流程"><a href="#NtWriteVirtualMemory流程" class="headerlink" title="NtWriteVirtualMemory流程"></a>NtWriteVirtualMemory流程</h3><p><img src="https://raw.githubusercontent.com/happy1wawayu/MyPic/main/2022-08-14-21-21-16-6461c2edc53d02a51fae4d7b3ecb6308-write-444ff1.png"></p>
+<p>通过分析这两个函数实现跨进程读写的原理可以发现，都是<strong>利用了进程高2G地址对应的物理页相同</strong>这个特性，先将数据暂存到高2G的位置，然后切换进程，再在另一个进程是进行读取操作。</p>
 ]]></content>
       <categories>
         <category>Windows内核</category>
