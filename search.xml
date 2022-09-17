@@ -2120,7 +2120,7 @@
   </entry>
   <entry>
     <title>跨进程读写内存</title>
-    <url>/2022/04/06/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E8%B7%A8%E8%BF%9B%E7%A8%8B%E8%AF%BB%E5%86%99%E5%86%85%E5%AD%98/</url>
+    <url>/2022/04/07/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/%E8%B7%A8%E8%BF%9B%E7%A8%8B%E8%AF%BB%E5%86%99%E5%86%85%E5%AD%98/</url>
     <content><![CDATA[<h2 id="要点回顾"><a href="#要点回顾" class="headerlink" title="要点回顾"></a>要点回顾</h2><p>跨进程的本质是“<strong>进程挂靠</strong>”，正常情况下，A进程的线程只能访问A进程的地址空间，如果A进程的线程想访问B进程的地址空间，就要修改当前的Cr3的值为B进程的页目录表基址（KPROCESS.DirectoryTableBase）</p>
 <p>即：</p>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov cr3, B.DirectoryTableBase</span><br></pre></td></tr></table></figure>
@@ -2142,5 +2142,10 @@
         <tag>Windows内核</tag>
         <tag>进程与线程</tag>
       </tags>
+  </entry>
+  <entry>
+    <title></title>
+    <url>/2022/09/17/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/%E7%AC%AC%E4%B8%80%E4%B8%AA%E9%A9%B1%E5%8A%A8%E7%A8%8B%E5%BA%8F/</url>
+    <content><![CDATA[]]></content>
   </entry>
 </search>
