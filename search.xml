@@ -2144,8 +2144,292 @@
       </tags>
   </entry>
   <entry>
-    <title></title>
-    <url>/2022/09/17/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/%E7%AC%AC%E4%B8%80%E4%B8%AA%E9%A9%B1%E5%8A%A8%E7%A8%8B%E5%BA%8F/</url>
-    <content><![CDATA[]]></content>
+    <title>第一个驱动程序</title>
+    <url>/2022/04/07/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/%E7%AC%AC%E4%B8%80%E4%B8%AA%E9%A9%B1%E5%8A%A8%E7%A8%8B%E5%BA%8F/</url>
+    <content><![CDATA[<p>在完成了进程和线程的学习后，我们发现，很多实验都受限于权限的限制，很难直接操纵0环的结构，然而，依靠中断门等提权方式进入0环，需要手动在Windbg中设置段描述符，就会变得很麻烦。而驱动恰恰可以解决这个问题，驱动可以直接和操作系统打交道，话不多说，开始驱动的学习吧。</p>
+<h2 id="环境配置搭建"><a href="#环境配置搭建" class="headerlink" title="环境配置搭建"></a>环境配置搭建</h2><h3 id="环境及工具"><a href="#环境及工具" class="headerlink" title="环境及工具"></a>环境及工具</h3><ul>
+<li>Visual Studio 2017</li>
+<li>WDK（Windows Driver Kit）:<a href="https://docs.microsoft.com/zh-cn/windows-hardware/drivers/other-wdk-downloads">下载地址</a></li>
+<li>DbgView：<a href="https://docs.microsoft.com/en-us/sysinternals/downloads/debugview">下载地址</a></li>
+<li>KmdManager</li>
+</ul>
+<p>先安装Visual Studio 2017在本机，再安装WDK到本机。DbgView和KmdManager则安装至虚拟机上。因为驱动若发生错误，则会导致系统崩溃，因而选择在虚拟机上进行实验。</p>
+<h3 id="项目创建"><a href="#项目创建" class="headerlink" title="项目创建"></a>项目创建</h3><ol>
+<li>安装完VS2017后，要安装SDK，且版本要与WDK的版本一致，如图我的SDK版本是17763 <img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/sdk.png" alt="img">那么安装的WDK版本，也得是17763<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/wdk.png" alt="img"></li>
+<li>校验好版本后，来创建驱动程序，新建项目 -&gt; Visual C++ -&gt; 测试 -&gt; Legacy -&gt; Empty WDM Driver [<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-18-19-19-a1c1910a5ddf448530ec964f6ab9dcbf-create-9719ec.png" alt="img"></li>
+<li>为什么要创建WDM的驱动程序，而不创建WDF的驱动程序呢？因为如果创建了WDF的驱动程序，在xp上执行会发生系统找不到指定文件的错误</li>
+</ol>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-18-21-00-a107abda2b68df547cf178786726de11-cantFindFile-59a92c.png" alt="img"></p>
+<p>具体原因也不是很清楚，至于这俩的区别可以参考<a href="https://docs.microsoft.com/zh-cn/windows-hardware/drivers/wdf/differences-between-wdm-and-kmdf">WDM和WDF之间的差异</a></p>
+<ol start="4">
+<li>接着点击确定，即可创建驱动程序项目了，但是需要注意一点，就是第一步中，SDK和WDK的版本必须要一致，否则会出现一个奇怪的错误<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-18-21-51-25b271734907a9868d68bf1651c0f51d-error-767aae.png" alt="img"></li>
+</ol>
+<p>如果版本相同，就不会出现这样的错误啦</p>
+<h3 id="项目属性配置"><a href="#项目属性配置" class="headerlink" title="项目属性配置"></a>项目属性配置</h3><ol>
+<li>右键项目，进入属性页，来配置一下项目的属性<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-19-09-29-37e870e03c3b8c7acfac57450dbf49c7-properties-27bf20.png" alt="img"></li>
+<li>接下来按照图中框中地方进行矫正即可<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-19-10-26-f3dbed1ca577a51165bf695369ebb843-prop1-aa4547.png" alt="img"><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-19-10-31-45b05c28a93ccb999d6213da3fe9fd94-prop2-40b7f1.png" alt="img"><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-19-10-34-dc9958436b0340b6a43f438fab556a26-prop3-99866d.png" alt="img"><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-19-10-39-2590b88559e49030a6d5d03d8daf387b-prop4-0df14f.png" alt="img"></li>
+<li>配置完即可创建文件了</li>
+</ol>
+<h2 id="编写第一个驱动程序"><a href="#编写第一个驱动程序" class="headerlink" title="编写第一个驱动程序"></a>编写第一个驱动程序</h2><h3 id="创建过程"><a href="#创建过程" class="headerlink" title="创建过程"></a>创建过程</h3><ol>
+<li><p>依然是按部就班的来，右键SourceFiles创建源文件 <img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-22-39-26-b831146aa656a02dd3cc0a96ed2e6019-createFile-5311f5.png" alt="img"></p>
+</li>
+<li><p>这里后缀名要用的c的，因为如果编写c++程序的驱动的话，编译器会做过多的优化，因而无法做到指令级别的掌控<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-22-39-48-f49ef7e40c89997daf1758d2b6d7c1e3-cSuffix-0e828a.png" alt="img"></p>
+</li>
+<li><p>修改文件编译属性，由于刚刚没有创建源文件，所以在项目属性配置时，并不能配置完全部属性，这里需要再配置一下<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-22-40-19-61ef955fe6e45af8c347304cc85e3d80-prop5-ec8e6d.png" alt="img"></p>
+</li>
+<li><p>编写驱动代码，具体如下</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;ntddk.h&quot;</span><br><span class="line"></span><br><span class="line">//卸载函数</span><br><span class="line">VOID DriverUnload(PDRIVER_OBJECT driver)</span><br><span class="line">&#123;</span><br><span class="line">	DbgPrint(&quot;驱动程序已停止.\r\n&quot;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">//驱动程序入口函数，相当于控制台的main函数</span><br><span class="line">NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject,PUNICODE_STRING RegistryPath)</span><br><span class="line">&#123;</span><br><span class="line">	DbgPrint(&quot;驱动程序已运行.\r\n&quot;);</span><br><span class="line">	//设置一个卸载函数  便于退出</span><br><span class="line">	DriverObject-&gt;DriverUnload = DriverUnload;</span><br><span class="line">	return STATUS_SUCCESS;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>选择生成HelloDriver</p>
+</li>
+</ol>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-22-40-37-cfb9abc97519df7bf2cb8d3918811319-build-91611d.png" alt="img"></p>
+<h3 id="结果验证"><a href="#结果验证" class="headerlink" title="结果验证"></a>结果验证</h3><ol>
+<li>将HelloDriver&#x2F;Debug目录下的HelloDriver.sys复制进虚拟机Windows Xp中</li>
+<li>打开DbgView，勾选Capture Kernel选项，用于捕获内核调试信息 <img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-22-41-10-523eee62d023398e9f207dd36305f181-dbgView-426ffd.png" alt="img"></li>
+<li>打开KmdManager，导入HelloDriver.sys，注册并运行，验证结果。<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-17-22-41-29-6203e05c41c2ca4bb56158ae74ae035b-run-74e141.png" alt="img"></li>
+</ol>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>驱动开发</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>内核空间&amp;内核模块</title>
+    <url>/2022/04/10/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/%E5%86%85%E6%A0%B8%E7%A9%BA%E9%97%B4&amp;%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97/</url>
+    <content><![CDATA[<p>对编写基础的驱动有所了解后，我们来进一步了解一下内核，本篇会介绍两个概念，内核空间以及内核模块，先从内核空间说起。</p>
+<h2 id="内核空间"><a href="#内核空间" class="headerlink" title="内核空间"></a>内核空间</h2><p>内核空间的概念，我们还是比较熟悉的。这里我们主要关注一点，就是<strong>不同进程</strong>在<strong>低2G</strong>内存空间对应的<strong>物理页往往是不同</strong>的，而在<strong>高2G</strong>内存空间对应的物理页<strong>往往是相同</strong>的。如图：</p>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-512fbd479956686d776e278134271def-space-842357.png" alt="img">这一要素，主要<strong>运用于跨进程读取内存</strong>等手法，之前的文章也提到过，这里我们来验证一下这个理论：</p>
+<ol>
+<li>第一步，写一个驱动，获取<strong>全局变量</strong>的地址，程序比较简单，就不贴代码了，直接上图<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-11-237e9e9a917e92e0528311202a30228c-code-954629.png" alt="img"></li>
+<li>第二步运行驱动，在DebugView中可以看到该全局变量的<strong>线性地址</strong>：0xbac93000 <img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-1434497b74f17158bd5868687b09c8f5-paraAddr-15ccad.png" alt="img"></li>
+<li>然后我们随机打开一个应用，这里以记事本为例。打开后，在Windbg中，找到记事本的Cr3查看该进程在线性地址0xbac93000处的值为多少<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-11-2b55d3c50cf50213bd59bb6abc1da910-notepad-e7b5c2.png" alt="img">可以发现，我们在记事本这个进程中查看0xbac93000这个线性地址对应的物理页时，它所存着的值恰好是我们在另一个驱动中定义的全局变量的值。这正说明了，<strong>不同进程在高2G中对应的物理页是相同的</strong>。（这里解释一下 .process 这个指令的作用，0xaaaabbbb对应着某个进程的进程结构体的地址，.process aaaabbbb这个指令就相当于切换到这个进程，之后所访问的地址，都是这个进程地址空间中的地址)</li>
+</ol>
+<h2 id="内核模块"><a href="#内核模块" class="headerlink" title="内核模块"></a>内核模块</h2><h3 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h3><p>有了内核空间的概念，这里介绍另一个概念，内核模块。看图<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-4fcaef3d55ae38e6c401b90917c5ca1d-kernelModule-e25ce9.png" alt="img"></p>
+<ul>
+<li>硬件种类繁多，<strong>不可能做出一个兼容所有硬件的内核</strong>，所以，微软提供规定的接口格式，让硬件驱动人员按照规定的格式编写“驱动程序”。当然，并不是每个驱动程序一定需要关联一个硬件，也可以仅仅是一个程序，就如同我们之前所写的。</li>
+<li>这些驱动程序，每一个都是一个模块，称为“<strong>内核模块</strong>”，<strong>都可以加载到内核中</strong>，也<strong>都遵守PE结构</strong>。本质上，任意一个.sys文件与内核文件（例如ntoskrnl.exe）没有区别。</li>
+</ul>
+<p>有了上述概念后，我们可以打个比喻，内核空间（高2G），相当于一个进程；而各个加载到内核中的内核模块，就相当于加载到进程中的DLL；内核模块提供0环的函数实现以及硬件的程序驱动，DLL为这个进程提供额外功能。这样就好理解了。</p>
+<h3 id="DRIVER-OBJECT"><a href="#DRIVER-OBJECT" class="headerlink" title="DRIVER_OBJECT"></a>DRIVER_OBJECT</h3><p>在之前编写的驱动程序中，入口函数总会传递一个参数，它的类型是PDRIVER_OBJECT，说明这是一个指向DRIVER_OBJECT的指针，而<strong>DRIVER_OBJECT正是驱动模块对应的结构体</strong>，来描述该驱动的相关信息。 </p>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-2dc72534bc5efa300fbb86bb736fa748-driverObject-add48b.png" alt="img">由图，这里着重介绍四个比较关键的字段：</p>
+<ul>
+<li>DriverStart(+0x00C)：驱动模块在内核中的地址</li>
+<li>DriverSize(+0x010)：驱动模块在内核中的大小</li>
+<li>DriverName(+0x01C)：驱动模块在内核中的名字</li>
+<li>DriverSection(+0x014)：这个位置存的是一个指针，<strong>指向一个_LDR_DATA_TABLE_ENTRY结构体</strong></li>
+</ul>
+<h3 id="LDR-DATA-TABLE-ENTRY"><a href="#LDR-DATA-TABLE-ENTRY" class="headerlink" title="LDR_DATA_TABLE_ENTRY"></a>LDR_DATA_TABLE_ENTRY</h3><p>驱动在内核中也属于内核模块，该结构体<strong>描述了内核模块的相关信息</strong>，同时包含串着所有内核模块的双向链表，通过该链表，可以遍历所有内核模块。<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-bab2f3cd6223bf32e66114e07a959ca7-ldte-2af0ea.png" alt="img"></p>
+<ul>
+<li>InLoadOrderLinks(+0x000)：<strong>串着所有内核模块的双向链表</strong></li>
+<li>DllBase(+0x018)：当前内核模块的基址</li>
+<li>SizeOfImage(+0x020)：当前内核模块的大小</li>
+<li>FullDllName(+0x024)：当前内核模块的完整路径</li>
+<li>BaseDllName(+0x02C)：当前内核模块的模块名</li>
+</ul>
+<h3 id="内核模块遍历"><a href="#内核模块遍历" class="headerlink" title="内核模块遍历"></a>内核模块遍历</h3><p>有了上面这些基础后呢，就可以自己实现内核模块遍历的功能了。这里先说一下思路：</p>
+<ol>
+<li>首先我们写一个驱动，驱动函数的入口会传一个PDRIVER_OBJECT这个参数，我们就可以利用这个参数，获取到自身驱动的DRIVER_OBJECT</li>
+<li>有了DRIVER_OBJECT结构体后，就可以通过其偏移0x014位置处的值，找到LDR_DATA_TABLE_ENTRY结构体，该结构体的第一个元素，就是串着所有内核模块的双向链表</li>
+<li>写一个循环，遍历这个双向链表，打印出相应的信息</li>
+</ol>
+<p>下面附上代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;ntddk.h&quot;</span><br><span class="line"></span><br><span class="line">VOID Driver_Unload(PDRIVER_OBJECT driver);</span><br><span class="line">VOID EnumKernelModule(PDRIVER_OBJECT driver);</span><br><span class="line"></span><br><span class="line">NTSTATUS DriverEntry(PDRIVER_OBJECT driver, PUNICODE_STRING RegistryPath) &#123;</span><br><span class="line"></span><br><span class="line">	DbgPrint(&quot;Driver is running!\n&quot;);</span><br><span class="line">	EnumKernelModule(driver);</span><br><span class="line"></span><br><span class="line">	driver-&gt;DriverUnload = Driver_Unload;</span><br><span class="line"></span><br><span class="line">	return STATUS_SUCCESS;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">VOID EnumKernelModule(PDRIVER_OBJECT driver) &#123;</span><br><span class="line">	UINT32 ds, dsCurrent;</span><br><span class="line"></span><br><span class="line">	DbgPrint(&quot;_Driver_Object: %x\n&quot;, driver);</span><br><span class="line">	DbgPrint(&quot;_LDR_DATA_TABLE_ENTRY: %x\n&quot;, driver-&gt;DriverSection);</span><br><span class="line"></span><br><span class="line">	ds = (UINT32)(driver-&gt;DriverSection);</span><br><span class="line">	dsCurrent = ds;</span><br><span class="line">	DbgPrint(&quot;Name: %wZ, Base: %x, Size: %x\n&quot;, (PUINT32)(ds + 0x2c), *(PUINT32)(ds + 0x18), *(PUINT32)(ds + 0x20));</span><br><span class="line"></span><br><span class="line">	while (1) &#123;</span><br><span class="line">		ds = *(PUINT32)ds;</span><br><span class="line">		if (ds == dsCurrent) &#123;</span><br><span class="line">			break;</span><br><span class="line">		&#125;</span><br><span class="line">		DbgPrint(&quot;Name: %wZ, Base: %x, Size: %x\n&quot;, (PUINT32)(ds + 0x2c), *(PUINT32)(ds + 0x18), *(PUINT32)(ds + 0x20));</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">VOID Driver_Unload(PDRIVER_OBJECT driver) &#123;</span><br><span class="line">	DbgPrint(&quot;Unload Success!&quot;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>观察实验结果：</p>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-4d35ecc72931f0a571272c1ee9307d47-traverse-133eaf.png" alt="img"></p>
+<p>这里主要打印了模块名，基址以及大小。观察结构可以发现，内核模块中不仅包含驱动文件，还有一些系统的dll，exe。因为它们<strong>本质上都是PE结构</strong>，所以不论是驱动文件还是内核文件，在内核空间中，都是一种内核模块。</p>
+<h2 id="关系梳理"><a href="#关系梳理" class="headerlink" title="关系梳理"></a>关系梳理</h2><p>之前，在学习完KPCR后，对进程结构体，线程结构体，KPCR进行了简单的<a href="https://happy1wawayu.github.io/2022/03/31/%E8%BF%9B%E7%A8%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B/KPCR/#%E5%85%B3%E7%B3%BB%E6%A2%B3%E7%90%86">关系梳理</a>，不过需要指出一点，在后面分析线程切换函数SwapContext时也指出了，<strong>线程寻找进程</strong>，<strong>主要用的是KTHREAD+0x44偏移处的Process</strong>，而不是用ETHREAD+0x220的偏移处的EPROCESS，不过呢，通常情况下，这两个地方都可以用。</p>
+<p>现在又学习完了驱动、内核相关的结构体，来看看它们之间的关系如何：</p>
+<h4 id="已知驱动"><a href="#已知驱动" class="headerlink" title="已知驱动"></a>已知驱动</h4><p>遍历内核模块：PDRIVER_OBJECT -&gt; DRIVER_OBJECT -&gt; DriverSection -&gt; _LDR_DATA_TABLE_ENTRY -&gt; InLoadOrderLinks</p>
+<p>遍历驱动结构体：PDRIVER_OBJECT -&gt; DRIVER_OBJECT -&gt; DriverSection -&gt; _LDR_DATA_TABLE_ENTRY -&gt; InLoadOrderLinks -&gt; DllBase（模块名.sys）</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>驱动开发</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>内核编程基础</title>
+    <url>/2022/04/09/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/%E5%86%85%E6%A0%B8%E7%BC%96%E7%A8%8B%E5%9F%BA%E7%A1%80/</url>
+    <content><![CDATA[<p>前面两篇文章分别介绍了驱动的编写以及调试驱动的方式，这一篇就对一些基础的概念以及注意事项做一个概括</p>
+<h2 id="内核API的使用"><a href="#内核API的使用" class="headerlink" title="内核API的使用"></a>内核API的使用</h2><ul>
+<li><p>在应用层编程我们可以使用Windows提供的各种API函数，只要导入头文件就可以了，但是在内核编程的时候，我们不能像在Ring3那样直接使用。微软为内核程序提供了专用的API，只要在程序中包含相应的头文件就可以使用了，例如：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;ntddk.h&quot;		//假定你已经正确安装了WDK</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>在应用层编程的时候，我们通过MSDN来了解函数的详细信息，在内核编程的时候，主要借助于<a href="https://docs.microsoft.com/zh-cn/windows-hardware/drivers/ddi/_kernel/">官方文档</a></p>
+</li>
+</ul>
+<h2 id="未导出函数的使用"><a href="#未导出函数的使用" class="headerlink" title="未导出函数的使用"></a>未导出函数的使用</h2><p>官方说明文档中只包含了内核模块导出的函数，对于<strong>未导出的函数</strong>，则不能直接使用。如果要<strong>使用未导出的函数</strong>，只要<strong>自己定义一个函数指针</strong>，并且<strong>为函数指针提供正确的函数地址</strong>就可以使用了。<strong>获取未导出函数地址的方法</strong>有如下两种：</p>
+<ol>
+<li>特征码搜索</li>
+<li>解析内核PDB文件</li>
+</ol>
+<h2 id="基本数据类型"><a href="#基本数据类型" class="headerlink" title="基本数据类型"></a>基本数据类型</h2><ul>
+<li><p>在内核编程的时候，尽量遵守WDK的编码习惯，<strong>不要这样写</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">unsigned long length;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>尽量使用WDK自己的类型：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">ULONG(unsigned long)          PULONG(unsigned long *)</span><br><span class="line">UCHAR(unsigned char)          PUCHAR(unsigned char *)</span><br><span class="line">UINT32(unsigned int)          PUNIT32(unsigned int *)	</span><br><span class="line">VOID(void)                    PVOID(void *)</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="返回值"><a href="#返回值" class="headerlink" title="返回值"></a>返回值</h2><p>大部分内核函数的返回值都是<strong>NTSTATUS类型</strong>，如：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">NTSTATUS PsCreateSystemThread();</span><br><span class="line">NTSTATUS ZwOpenProcess();</span><br><span class="line">NTSTATUS ZwOpenEvent();</span><br></pre></td></tr></table></figure>
+
+<p>这个类型的值用来说明函数执行的结果，例如：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">STATUS_SUCCESS			0x00000000			//成功</span><br><span class="line">STATUS_INVALID_PARAMETER	0xC000000D			//参数无效</span><br><span class="line">STATUS_BUFFER_OVERFLOW		0x80000005			//缓冲区长度不够</span><br></pre></td></tr></table></figure>
+
+<p>当你调用的内核函数，如果返回的结果不是STATUS_SUCCESS，就说明函数执行中遇到了问题，具体是什么问题，可以<strong>参考ntstatus.h文件</strong></p>
+<h2 id="内核中的异常处理"><a href="#内核中的异常处理" class="headerlink" title="内核中的异常处理"></a>内核中的异常处理</h2><p>在内核中，一个小小的错误就可能导致蓝屏，例如读写一个无效的内存地址。为了让自己的内核程序更加健壮，在<strong>编写内核程序时</strong>，<strong>使用异常处理</strong>是非常有必要的。</p>
+<p>Windows提供了**结构化异常处理(SEH)**机制，大部分编译器都有支持，大致如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">__try &#123;</span><br><span class="line">    //可能出错的代码</span><br><span class="line">&#125;</span><br><span class="line">__except(filter_value)&#123;</span><br><span class="line">    //出错时要执行的代码</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>出现异常时，可根据filter_value的值来决定程序该如何执行，filter_value的值主要如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">EXCEPTION_EXECUTE_HANDLER        1          //代码进入except块</span><br><span class="line">EXCEPTION_CONTINUE_SEARCH        0          //不处理异常，由上一层调用函数处理</span><br><span class="line">EXCEPTION_CONTINUE_EXECUTION    -1          //回去继续执行错误处的代码</span><br></pre></td></tr></table></figure>
+
+<h2 id="常用的内核内存函数"><a href="#常用的内核内存函数" class="headerlink" title="常用的内核内存函数"></a>常用的内核内存函数</h2><p>简要介绍一些对内存进行使用的功能函数：申请、设置、拷贝以及释放</p>
+<table>
+<thead>
+<tr>
+<th>C语言</th>
+<th>内核中</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>malloc</td>
+<td>ExAllocatePool</td>
+</tr>
+<tr>
+<td>memset</td>
+<td>RtlFillMemory</td>
+</tr>
+<tr>
+<td>memcpy</td>
+<td>RtlMoveMemory</td>
+</tr>
+<tr>
+<td>free</td>
+<td>ExFreePool</td>
+</tr>
+</tbody></table>
+<p>以ExAllocatePool为例，对应的语法为：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">PVOID ExAllocatePool(</span><br><span class="line">  POOL_TYPE		PoolType,</span><br><span class="line">  SIZE_T		NumberOfBytes</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<p>其中POOL_TYPE的类型主要有</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">typedef enum _POOL_TYPE &#123;</span><br><span class="line">  NonPagedPool,                  // 这块内存不可以放到文件中，用于存放代码</span><br><span class="line">  NonPagedPoolExecute,</span><br><span class="line">  PagedPool,                     // 这块内存不常用时可以放到文件中(硬盘)，用于存放数据</span><br><span class="line">  NonPagedPoolMustSucceed,</span><br><span class="line">  DontUseThisType,</span><br><span class="line">  NonPagedPoolCacheAligned,</span><br><span class="line">  PagedPoolCacheAligned,</span><br><span class="line">  NonPagedPoolCacheAlignedMustS,</span><br><span class="line">  MaxPoolType,</span><br><span class="line">  NonPagedPoolBase,</span><br><span class="line">  NonPagedPoolBaseMustSucceed,</span><br><span class="line">  NonPagedPoolBaseCacheAligned,</span><br><span class="line">  NonPagedPoolBaseCacheAlignedMustS,</span><br><span class="line">  NonPagedPoolSession,</span><br><span class="line">  PagedPoolSession,</span><br><span class="line">  NonPagedPoolMustSucceedSession,</span><br><span class="line">  DontUseThisTypeSession,</span><br><span class="line">  NonPagedPoolCacheAlignedSession,</span><br><span class="line">  PagedPoolCacheAlignedSession,</span><br><span class="line">  NonPagedPoolCacheAlignedMustSSession,</span><br><span class="line">  NonPagedPoolNx,</span><br><span class="line">  NonPagedPoolNxCacheAligned,</span><br><span class="line">  NonPagedPoolSessionNx</span><br><span class="line">&#125; POOL_TYPE;</span><br></pre></td></tr></table></figure>
+
+<h2 id="内核字符串"><a href="#内核字符串" class="headerlink" title="内核字符串"></a>内核字符串</h2><h3 id="字符串种类"><a href="#字符串种类" class="headerlink" title="字符串种类"></a>字符串种类</h3><p>内核中的字符串主要有4种：</p>
+<ol>
+<li><p>CHAR(char)</p>
+</li>
+<li><p>WCHAR(wchar_t)</p>
+</li>
+<li><p>ANSI_STRING</p>
+</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">typedef struct _STRING &#123;</span><br><span class="line">    USHORT Length;</span><br><span class="line">    USHORT MaximumLength;</span><br><span class="line">    PCHAR Buffer;</span><br><span class="line">&#125;STRING;</span><br></pre></td></tr></table></figure>
+<ol start="4">
+<li><p>UNICODE_STRING</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">typedef struct _UNICODE_STRING &#123;</span><br><span class="line">    USHORT Length;</span><br><span class="line">    USHORT MaximumLength;</span><br><span class="line">    PWSTR Buffer;</span><br><span class="line">&#125;UNICODE_STRING;</span><br></pre></td></tr></table></figure>
+
+<p>使用ANSI_STRING和UNICODE_STRING的好处是其结构包含最大长度，可以有效<strong>防止字符串越界崩溃</strong>的情况</p>
+</li>
+</ol>
+<h3 id="字符串常用函数"><a href="#字符串常用函数" class="headerlink" title="字符串常用函数"></a>字符串常用函数</h3><p>字符串常用的功能无非就是：创建、复制、比较以及转换等等</p>
+<table>
+<thead>
+<tr>
+<th>ANSI_STRING字符串</th>
+<th>UNICODE_STRING字符串</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RtlInitAnsiString</td>
+<td>RtlInitUnicodeString</td>
+</tr>
+<tr>
+<td>RtlCopyString</td>
+<td>RtlCopyUnicodeString</td>
+</tr>
+<tr>
+<td>RtlCompareString</td>
+<td>RtlCompareUnicoodeString</td>
+</tr>
+<tr>
+<td>RtlAnsiStringToUnicodeString</td>
+<td>RtlUnicodeStringToAnsiString</td>
+</tr>
+</tbody></table>
+<p>一般在驱动中会通过DbgPrint函数格式化输出到DbgView上，上述字符串有如下对应关系：</p>
+   <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&quot;%s&quot;---ANSI_STRING.Buffer</span><br><span class="line">&quot;%S&quot;---UNICODE_STRING.Buffer</span><br><span class="line">&quot;%Z&quot;---&amp;ANSI_STRING</span><br><span class="line">&quot;wZ&quot;---&amp;UNICODE_STRING</span><br></pre></td></tr></table></figure>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>驱动开发</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>驱动调试</title>
+    <url>/2022/04/08/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/%E9%A9%B1%E5%8A%A8%E8%B0%83%E8%AF%95/</url>
+    <content><![CDATA[<p>之前介绍了如何编写一个简单的驱动程序，相比exe程序，可以直接拖进OD内调试，驱动文件必须依赖操作系统才能执行。所以需要依靠Windbg进行双机调试来实现（配置双机调试可以参考<a href="https://blog.csdn.net/q1007729991/article/details/52710390">这里</a>）。具体如何调试驱动，下面一起来看看吧</p>
+<h2 id="PDB文件"><a href="#PDB文件" class="headerlink" title="PDB文件"></a>PDB文件</h2><p>在学习驱动调试之前，先要了解PDB文件。PDB文件（Program DateBase File）有什么用呢？我们来看个例子：</p>
+<p>在Windbg中，通过u（unassemble）指令可以看到<strong>指定地址</strong>的汇编；当我们给定一个特定的地址时，它往往可以识别出这个函数，亦或是给定一个函数名，它可以直接定位到特定的地址</p>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-04-37f928b9188ff56cce37f5f72a475b11-u-15ad3b.png" alt="img"></p>
+<p>这到底是如何做到的呢？ 我们先看定义，PDB文件是一类<strong>用于存储程序调试信息</strong>的属性文件。它会伴随着源文件编译时创建出来。<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-04-6249ea06a1c28429340f59d981aae916-exePdb-9efa3d.png" alt="img"><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-04-33081616455debd4de9b9339174e193b-dllPdb-32970f.png" alt="img"><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-04-615ae1a4db46dc351ea160e5a02cbe9e-sysPdb-5ccf84.png" alt="img"></p>
+<p>结合上图和定义可以发现，无论是exe，dll还是sys文件，都有对应的pdb文件，且pdb文件体积很大，这是因为pdb包含了大量调试用的信息，这也是为什么Windbg能够快速识别各类0环函数信息，因为它加载了Windows符号表。Windows符号表是一组包含了内核函数调试信息的pdb文件。</p>
+<h2 id="加载符号表"><a href="#加载符号表" class="headerlink" title="加载符号表"></a>加载符号表</h2><p>加载符号表的步骤非常简单，之前进行过双击调试的小伙伴应该已经自行加载过了，这里再演示一遍：</p>
+<ol>
+<li>进入Windbg界面，File -&gt; SymbolFilePath</li>
+</ol>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-04-f7b47dbf8fb98df85f7e649929564dd4-load1-161fa9.png" alt="img"></p>
+<ol start="2">
+<li>进入后，可以看到，这是我导入的Windows符号表，里面包含了内核函数的pdb文件<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-04-8a0ca4ead6375c0c3b98beede5a249d9-load2-795dcb.png" alt="img"></li>
+</ol>
+<p>由于Windows官方不再提供符号表，这里我使用的是Xp sp3的符号表，可以作为参考(<a href="https://pan.baidu.com/s/1GNqgIoDjP2xx8Q6diCFL7g">提取码：3akx</a>) 实际情况最好选择与操作系统版本相适应的符号表</p>
+<ol start="3">
+<li>导入符号表后，在Windbg中键入.reload指令完成符号信息加载</li>
+</ol>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-05-9f8a2f9025c47b84b2455a185f78d88a-load3-060cda.png" alt="img"></p>
+<h2 id="驱动调试示例"><a href="#驱动调试示例" class="headerlink" title="驱动调试示例"></a>驱动调试示例</h2><p>有了前面的基础，我们来尝试一下如何调试一个驱动程序吧</p>
+<ol>
+<li><p>首先，写一个驱动程序，加入用于测试的代码</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;ntddk.h&quot;</span><br><span class="line"></span><br><span class="line">VOID DriverUnload(PDRIVER_OBJECT driver)</span><br><span class="line">&#123;</span><br><span class="line">	DbgPrint(&quot;驱动程序已停止.\r\n&quot;);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)</span><br><span class="line">&#123;</span><br><span class="line">	//中断到调试器</span><br><span class="line">	_asm &#123;</span><br><span class="line">		int 3</span><br><span class="line">		mov eax, eax</span><br><span class="line">		mov eax, eax</span><br><span class="line">		mov ecx, ecx</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	DbgPrint(&quot;驱动程序已运行.\r\n&quot;);</span><br><span class="line">	DriverObject-&gt;DriverUnload = DriverUnload;</span><br><span class="line"></span><br><span class="line">	return STATUS_SUCCESS;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里面嵌入了一段汇编，这样可以在程序执行时中断到调试器</p>
+</li>
+<li><p>然后，我们将该驱动程序的pdb文件路径拷贝到Windbg的SymbolFilePath中<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-05-0c9b2a8ced16b1955cfec19b10a5baec-loadPdb-429688.png" alt="img"><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-05-fcd1bcdda07ced90930d7efc71c1a6b1-loadPdb2-12c149.png" alt="img">这样Windbg就加载了我们驱动程序的符号文件了</p>
+</li>
+<li><p>有了符号文件，就可以用Windbg调试驱动了：</p>
+<ul>
+<li>将驱动程序复制到调试机器，运行后发现会操作系统卡死<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-05-21ee989d249de162cde2fba93871cf0a-dbgDriver1-3f329c.png" alt="img"></li>
+<li>进入Windbg发现程序中断到了int 3指令的位置，并在左边显示了咱们编写的驱动程序<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-05-0ccaddf9cbe815e9f8b88bdd3e5ec4fd-dbgDriver2-e9056b.png" alt="img"></li>
+<li>执行t指令可以进行单步调试<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-05-5d7724bcb1fc7a252bef33afeea6d038-dbgDriver3-8bbce6.png" alt="img"></li>
+<li>调试完后可键入g指令继续执行程序</li>
+</ul>
+</li>
+</ol>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-20-54-05-4ba9e7dffda7ff9b2e14c0f745b04029-dbgDriver4-1fcd67.png" alt="img"></p>
+<p>这样，一次简单的驱动调试就完成啦</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>驱动开发</tag>
+      </tags>
   </entry>
 </search>
