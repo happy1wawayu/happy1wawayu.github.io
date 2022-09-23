@@ -2204,7 +2204,8 @@
     <url>/2022/04/10/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/%E5%86%85%E6%A0%B8%E7%A9%BA%E9%97%B4&amp;%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97/</url>
     <content><![CDATA[<p>对编写基础的驱动有所了解后，我们来进一步了解一下内核，本篇会介绍两个概念，内核空间以及内核模块，先从内核空间说起。</p>
 <h2 id="内核空间"><a href="#内核空间" class="headerlink" title="内核空间"></a>内核空间</h2><p>内核空间的概念，我们还是比较熟悉的。这里我们主要关注一点，就是<strong>不同进程</strong>在<strong>低2G</strong>内存空间对应的<strong>物理页往往是不同</strong>的，而在<strong>高2G</strong>内存空间对应的物理页<strong>往往是相同</strong>的。如图：</p>
-<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-512fbd479956686d776e278134271def-space-842357.png" alt="img">这一要素，主要<strong>运用于跨进程读取内存</strong>等手法，之前的文章也提到过，这里我们来验证一下这个理论：</p>
+<p><img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-512fbd479956686d776e278134271def-space-842357.png" alt="img"></p>
+<p>这一要素，主要<strong>运用于跨进程读取内存</strong>等手法，之前的文章也提到过，这里我们来验证一下这个理论：</p>
 <ol>
 <li>第一步，写一个驱动，获取<strong>全局变量</strong>的地址，程序比较简单，就不贴代码了，直接上图<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-11-237e9e9a917e92e0528311202a30228c-code-954629.png" alt="img"></li>
 <li>第二步运行驱动，在DebugView中可以看到该全局变量的<strong>线性地址</strong>：0xbac93000 <img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-18-23-17-12-1434497b74f17158bd5868687b09c8f5-paraAddr-15ccad.png" alt="img"></li>
@@ -2431,5 +2432,61 @@
         <tag>Windows内核</tag>
         <tag>驱动开发</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>特征码搜索未导出函数</title>
+    <url>/2022/04/11/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/%E7%89%B9%E5%BE%81%E7%A0%81%E6%90%9C%E7%B4%A2%E6%9C%AA%E5%AF%BC%E5%87%BA%E5%87%BD%E6%95%B0/</url>
+    <content><![CDATA[<p>本篇进行一个小实验，编写一个函数，通过特征码搜索一个未导出函数（PspTerminateProcess），并调用。看着不复杂，但是涉及到了很多细节，这里逐步分析。</p>
+<h2 id="什么是未导出函数"><a href="#什么是未导出函数" class="headerlink" title="什么是未导出函数"></a>什么是未导出函数</h2><p>先介绍一个概念，未导出函数。什么是未导出函数呢？</p>
+<p>这个举个简单的例子，Ntoskrnl.exe中有很多内核函数，其中包括我们之前分析过的NtReadVirtualMemory函数。这个函数是ReadProcessMemory在0环的实现，但它是一个未导出函数，用IDA打开Ntoskrnl.exe，在Exports（导出表）中搜索NtReadVirtualMemory<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-23-23-09-08-d7435010278a11c0fa2723f8c9d1d97b-unexported-259320.png" alt="img"></p>
+<p>结果发现，并没有搜索到NtReadVirtualMemory，原因是它并<strong>没有被导出</strong>，所以导出表里面，没有该函数，但是这个函数又的确存在在Ntoskrnl.exe这个模块中。</p>
+<p>未导出函数的主要<strong>目的</strong>，是<strong>不想提供给别人使用</strong>，官方文档也不会写入相关内容。因此，我们是<strong>不能通过函数名直接调用</strong>该函数的。</p>
+<h2 id="如何调用未导出函数"><a href="#如何调用未导出函数" class="headerlink" title="如何调用未导出函数"></a>如何调用未导出函数</h2><p>调用未导出函数主要有两种办法：</p>
+<ol>
+<li><strong>特征码搜索</strong>，这也是本篇会着重介绍的。在前一篇文章中，提到过可以通过驱动结构体的DriverSection字段，找到一个_LDR_DATA_TABLE_ENTRY结构体，然后即可遍历内核的全部模块。这时，如果我们<strong>确定了未导出函数所在的模块</strong>，便可以通过在链表中找到模块对应的描述信息，例如模块基址，大小等。这时，我们再利用这些信息，<strong>结合未导出函数的特征码</strong>，<strong>搜索这个模块的内存</strong>，便能找到所需的未导出函数。这时只需<strong>定义一个函数指针</strong>，<strong>指向</strong>咱们<strong>找到的函数首地址</strong>，就可以实现对未导出函数的调用。</li>
+<li><strong>外层函数调用</strong>，如果有一个函数A调用了未导出函数B，那么函数A中一定有未导出函数B的函数地址，我们只要找到这个调用点，就可以确定函数B的地址了。然后再定义一个函数指针，就可实现这个过程。</li>
+</ol>
+<h2 id="特征码选择"><a href="#特征码选择" class="headerlink" title="特征码选择"></a>特征码选择</h2><p>在特征码的选择上也是有讲究的，拿本次实验的PspTerminateProcess函数来举例<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-23-23-09-08-4ee517a49b2336be18a1694a54646d4c-ptp-7d068b.png" alt="img">结合图片来看。</p>
+<ul>
+<li><strong>橙色方框圈住</strong>的地方就<strong>不适合作为特征码</strong>，这部分的语句，<strong>比较常见</strong>，在很多内核函数中都容易看到，因此不适合作为特征码，有可能会因此找到了别的内核函数。</li>
+<li><strong>红色方框圈住</strong>的地方相对来说就比较适合作为特征码，当然，连续四行完全相同的语句，还是比较少见的，因此，选中的代码段越多，就越合适作为特征码</li>
+</ul>
+<p>有一点需要说明的是，特征码不是汇编，而是硬编码，具体应用时，可以将这些特征码放入到一个字符串中，例如：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">UCHAR AttrCode[6] = &#123;0x8b, 0x75, 0x08, 0x3b, 0x70, 0x44&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后与指定的内存进行逐一比较，若发现相同的地方，很有可能就找对了对方，然后再减去函数内的偏移，得到函数的首地址，就可以获取该函数了</p>
+<h2 id="代码实现"><a href="#代码实现" class="headerlink" title="代码实现"></a>代码实现</h2><p>这部分的代码实现不是非常难，并且用到了前一篇用到的知识，这里仅再重述一遍思路：</p>
+<ol>
+<li>通过当前驱动结构体<strong>找到内核模块结构体链表</strong></li>
+<li>遍历内核模块，<strong>找到Ntoskrnl.exe</strong>（PspTerminateProcess所在模块）模块结构体</li>
+<li><strong>获取模块基址</strong>、<strong>模块大小</strong></li>
+<li><strong>确定特征码</strong></li>
+<li>从模块基址开始的地方，与特征码依次进行比对，从而<strong>找到未导出函数PspTerminateProcess</strong></li>
+<li>用一个<strong>函数指针指向</strong>未导出函数</li>
+<li>调用函数PspTerminateProcess</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#include &quot;ntifs.h&quot;</span><br><span class="line"></span><br><span class="line">typedef NTSTATUS NTKERNELAPI(*PspTerminateProcess)(PEPROCESS Process, NTSTATUS ExitStatus);</span><br><span class="line"></span><br><span class="line">VOID Driver_Unload(PDRIVER_OBJECT driver);</span><br><span class="line">UINT32 FindKernelModule(PDRIVER_OBJECT driver);</span><br><span class="line">PVOID FindAttrCode(PDRIVER_OBJECT driver);</span><br><span class="line">VOID TestFunc(PDRIVER_OBJECT driver);</span><br><span class="line"></span><br><span class="line">NTSTATUS DriverEntry(PDRIVER_OBJECT driver, PUNICODE_STRING RegistryPath) &#123;</span><br><span class="line"></span><br><span class="line">	DbgPrint(&quot;Driver is running!\n&quot;);</span><br><span class="line">	TestFunc(driver);</span><br><span class="line"></span><br><span class="line">	driver-&gt;DriverUnload = Driver_Unload;</span><br><span class="line"></span><br><span class="line">	return STATUS_SUCCESS;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">VOID TestFunc(PDRIVER_OBJECT driver) &#123;</span><br><span class="line">	PspTerminateProcess pFun;</span><br><span class="line">	PEPROCESS pEprocess;</span><br><span class="line"></span><br><span class="line">	pFun = FindAttrCode(driver);</span><br><span class="line">	if (pFun != NULL) &#123;</span><br><span class="line">		//		DbgPrint(&quot;Get Success\n&quot;);</span><br><span class="line">		//PID的值根据具体进程而定</span><br><span class="line">		PsLookupProcessByProcessId((HANDLE)1752, &amp;pEprocess);</span><br><span class="line">		pFun(pEprocess, 1);</span><br><span class="line">		DbgPrint(&quot;Close notepad success!&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">	else &#123;</span><br><span class="line">		DbgPrint(&quot;Get Failed\n&quot;);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">PVOID FindAttrCode(PDRIVER_OBJECT driver) &#123;</span><br><span class="line">	UINT32 i = 0;</span><br><span class="line">	UINT32 ds = FindKernelModule(driver);</span><br><span class="line">	UINT32 ModuleBase = *(PUINT32)(ds + 0x18);</span><br><span class="line">	UINT32 ModuleSize = *(PUINT32)(ds + 0x20);</span><br><span class="line">	//+0xC</span><br><span class="line">	UCHAR Offset[15] = &#123;</span><br><span class="line">		0x8b, 0x75, 0x08, 0x3b, 0x70, 0x44,</span><br><span class="line">		0x75, 0x07, 0xb8, 0x0d, 0x00, 0x00,</span><br><span class="line">		0xc0, 0xeb, 0x5a &#125;;</span><br><span class="line">	PUCHAR pModuleMemory = NULL;</span><br><span class="line"></span><br><span class="line">	__try &#123;</span><br><span class="line">		DbgPrint(&quot;Name: %wZ, Base: %x, Size: %x\n&quot;, (PUINT32)(ds + 0x2c), ModuleBase, ModuleSize);</span><br><span class="line">		while (i &lt; (ModuleSize - 0xf)) &#123;</span><br><span class="line">			pModuleMemory = (PUCHAR)(ModuleBase + i);</span><br><span class="line">			if (RtlCompareMemory(Offset, pModuleMemory, 0xf) == 0xf) &#123;</span><br><span class="line">				//  DbgPrint(&quot;%016x&quot;, *pModuleMemory);</span><br><span class="line">				return pModuleMemory - 0xc;</span><br><span class="line">			&#125;</span><br><span class="line">			i++;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	__except (1) &#123;</span><br><span class="line"></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	return NULL;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">UINT32 FindKernelModule(PDRIVER_OBJECT driver) &#123;</span><br><span class="line">	UINT32 ds, dsCurrent, dsDest;</span><br><span class="line">	UNICODE_STRING dllStr;</span><br><span class="line"></span><br><span class="line">	RtlInitUnicodeString(&amp;dllStr, L&quot;ntoskrnl.exe&quot;);</span><br><span class="line"></span><br><span class="line">	//	DbgPrint(&quot;_Driver_Object: %x\n&quot;, driver);</span><br><span class="line">	//	DbgPrint(&quot;_LDR_DATA_TABLE_ENTRY: %x\n&quot;, driver-&gt;DriverSection);</span><br><span class="line"></span><br><span class="line">	ds = (UINT32)(driver-&gt;DriverSection);</span><br><span class="line">	dsCurrent = ds;</span><br><span class="line">	//	DbgPrint(&quot;Name: %wZ, Base: %x, Size: %x\n&quot;, (PUINT32)(ds + 0x2c), *(PUINT32)(ds + 0x18), *(PUINT32)(ds + 0x20));</span><br><span class="line"></span><br><span class="line">	while (1) &#123;</span><br><span class="line">		ds = *(PUINT32)ds;</span><br><span class="line">		if (ds == dsCurrent) &#123;</span><br><span class="line">			break;</span><br><span class="line">		&#125;</span><br><span class="line">		if (RtlCompareUnicodeString(&amp;dllStr, (PUINT32)(ds + 0x2c), TRUE) == 0) &#123;</span><br><span class="line">			//			DbgPrint(&quot;Name: %wZ, Base: %x, Size: %x\n&quot;, (PUINT32)(ds + 0x2c), *(PUINT32)(ds + 0x18), *(PUINT32)(ds + 0x20));</span><br><span class="line">			break;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">	&#125;</span><br><span class="line">	dsDest = ds;</span><br><span class="line">	return dsDest;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">VOID Driver_Unload(PDRIVER_OBJECT driver) &#123;</span><br><span class="line">	DbgPrint(&quot;Unload Success!&quot;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="结果验证"><a href="#结果验证" class="headerlink" title="结果验证"></a>结果验证</h2><ol>
+<li>本次实验，计划<strong>通过调用未导出函数PspTerminateProcess关掉指定进程</strong>（本次实验采用记事本）</li>
+<li>在PC Hunter确定记事本的Pid <img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-23-23-09-08-662339da854298e8468a394f2a67c074-pid-286d8b.png" alt="img"></li>
+<li>写入到代码中<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-23-23-09-08-4133ddbbeb4157dff861d314416a5b9b-code-679e96.png" alt="img"></li>
+<li>生成.sys驱动文件，复制到虚拟机。通过Kmd Manager注册<img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-23-23-09-08-436fef21484fcf34d8b7f9ce5e6b3e24-register-2a514a.png" alt="img">运行该驱动，查看结果 <img src="https://pic-1305566393.cos.ap-shanghai.myqcloud.com/img/2022-09-23-23-09-08-40402de9fc41956f94dfc0ffb2af45f0-result-abe4c7.png" alt="img"></li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本次实验，通过在内存中搜索特征码，调用了一个未导出函数PspTerminateProcess，并关掉了记事本这个进程，当然我们是手动将Pid填入代码后才实现的指定进程，随着进一步学习，会逐渐改进并完善这份代码</p>
+]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>驱动开发</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title></title>
+    <url>/2022/09/23/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/3%E7%8E%AF%E4%B8%8E0%E7%8E%AF%E9%80%9A%E4%BF%A1%EF%BC%88%E5%B8%B8%E8%A7%84%E6%96%B9%E5%BC%8F%EF%BC%89/</url>
+    <content><![CDATA[]]></content>
   </entry>
 </search>
