@@ -2485,8 +2485,16 @@
       </tags>
   </entry>
   <entry>
-    <title></title>
-    <url>/2022/09/23/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/3%E7%8E%AF%E4%B8%8E0%E7%8E%AF%E9%80%9A%E4%BF%A1%EF%BC%88%E5%B8%B8%E8%A7%84%E6%96%B9%E5%BC%8F%EF%BC%89/</url>
+    <title>3环与0环通信（常规方式）</title>
+    <url>/2022/04/12/%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/3%E7%8E%AF%E4%B8%8E0%E7%8E%AF%E9%80%9A%E4%BF%A1%EF%BC%88%E5%B8%B8%E8%A7%84%E6%96%B9%E5%BC%8F%EF%BC%89/</url>
     <content><![CDATA[]]></content>
+      <categories>
+        <category>Windows内核</category>
+      </categories>
+      <tags>
+        <tag>x86</tag>
+        <tag>Windows内核</tag>
+        <tag>驱动开发</tag>
+      </tags>
   </entry>
 </search>
